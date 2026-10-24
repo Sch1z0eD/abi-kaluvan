@@ -8,7 +8,7 @@ const Vision = (() => {
   const EDGE_FILL = 0.55;   // частка межі, яку має покривати лінія (можна шматками)
   const EDGE_RUN = 0.25;    // і хоча б один суцільний шматок такої довжини
   const OCC_T = 40;         // яскравість, з якої піксель вважається «вмістом»
-  const EDGE_REL = 0.7;     // межа вантажу — не слабша за таку частку від типової межі на кадрі
+  const EDGE_REL = 0.6;     // межа вантажу — не слабша за таку частку від типової межі на кадрі (лінії всередині відкритого вантажу ~0.5)
 
   function toGray(data, w, h) {
     const g = new Uint8Array(w * h);
@@ -156,7 +156,29 @@ const Vision = (() => {
     const fx = fitLines(V, px + c0 * P, P, c1 - c0), fy = fitLines(H, py + r0 * P, P, r1 - r0);
     const fits = [fx, fy].filter(Boolean);
     const Pf = fits.length ? fits.reduce((a, f) => a + f.P * f.n, 0) / fits.reduce((a, f) => a + f.n, 0) : P;
-    return { P: Pf, x0: fx ? fx.x0 : px + c0 * P, y0: fy ? fy.x0 : py + r0 * P, cols: c1 - c0, rows: r1 - r0 };
+    const x0 = fx ? fx.x0 : px + c0 * P, y0 = fy ? fy.x0 : py + r0 * P;
+    // На малій роздільності (1280×720, 1280×1024) клітинка ~40 px, і навіть 0.2 px похибки на 9 колонок
+    // зсувають крайні лінії повз справжні. Тож кожну лінію окремо підтягуємо до піку поруч.
+    return { P: Pf, x0, y0, cols: c1 - c0, rows: r1 - r0, xs: snapLines(V, x0, Pf, c1 - c0), ys: snapLines(H, y0, Pf, r1 - r0) };
+  }
+
+  // Точні положення ліній k = 0..count: пік профілю біля x0 + k*P, а де піку не видно — розрахункове
+  function snapLines(p, x0, P, count) {
+    const r = Math.max(2, Math.round(P * 0.06));
+    const peaks = [];
+    for (let k = 0; k <= count; k++) {
+      const e = Math.round(x0 + k * P);
+      let best = e, bestV = 0;
+      for (let x = e - r; x <= e + r; x++) if (p[x] > bestV) { bestV = p[x]; best = x; }
+      peaks.push({ e, best, v: bestV });
+    }
+    const vs = peaks.map(q => q.v).sort((a, b) => a - b), med = vs[vs.length >> 1];
+    return peaks.map(q => {
+      if (!(q.v >= med * 0.35) || !q.v) return q.e;
+      let s = 0, sw = 0;
+      for (let x = q.best - 2; x <= q.best + 2; x++) if (p[x] >= q.v * 0.6) { s += x * p[x]; sw += p[x]; }
+      return Math.round(s / sw);
+    });
   }
 
   // Знаходить справжні піки ліній біля очікуваних позицій start + k*P і підганяє пряму pos = x0 + k*P
@@ -217,7 +239,8 @@ const Vision = (() => {
   function segment(G, maps, grid) {
     const { w } = G;
     const { P, x0, y0, cols, rows } = grid;
-    const X = c => Math.round(x0 + c * P), Y = r => Math.round(y0 + r * P);
+    const X = c => (grid.xs && grid.xs[c] !== undefined ? grid.xs[c] : Math.round(x0 + c * P));
+    const Y = r => (grid.ys && grid.ys[r] !== undefined ? grid.ys[r] : Math.round(y0 + r * P));
     const pad = Math.round(P * 0.12), len = Math.round(P) - 2 * pad;
     // Типова межа — медіана сили всіх ліній сітки (переважно це межі вантажів і порожніх клітинок).
     // Слабші за EDGE_REL від неї — лінії всередині відкритого вантажу, а не його межі.

@@ -37,10 +37,12 @@ const Ocr = (() => {
     return lanes[name];
   }
 
-  function start() { return lane('label').worker; }
+  // Запускаємо всі розпізнавачі одразу (після «Почати ловлю»): інакше перша ціна чи перші написи
+  // чекали б ще й на запуск (~0.4 с). Написи читають два розпізнавачі паралельно.
+  function start() { return Promise.all(['label', 'label2', 'tip'].map(n => lane(n).worker)); }
 
-  function read(canvas) {
-    return readData(canvas, 'label').then(data => data.text);
+  function read(canvas, name = 'label') {
+    return readData(canvas, name).then(data => data.text);
   }
 
   // Повний результат: текст і рядки зі словами та прямокутниками (bbox у пікселях полотна).
@@ -57,10 +59,15 @@ const Ocr = (() => {
   }
 
   // Рамка з ціною: білий текст на майже чорному. Збільшуємо вдвічі й інвертуємо.
+  // Текст гри однаковий у клітинках, а клітинка — від роздільності (1280×1024 ~40 px, 2K ~85 px).
+  // Збільшуємо так, щоб для Tesseract текст був однієї висоти: при 64 px (1080p) — удвічі.
   const TIP_SCALE = 2;
-  function tipCanvas(src, x, y, w, h) {
+  const tipScale = P => (P ? Math.min(3, Math.max(1.25, 128 / P)) : TIP_SCALE);
+  function tipCanvas(src, x, y, w, h, P) {
+    const k = tipScale(P);
     const c = document.createElement('canvas');
-    c.width = Math.round(w * TIP_SCALE); c.height = Math.round(h * TIP_SCALE);
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.ocrScale = k;
     const ctx = c.getContext('2d');
     ctx.filter = 'grayscale(1) invert(1) contrast(1.4)';
     ctx.drawImage(src, x, y, w, h, 0, 0, c.width, c.height);
@@ -129,15 +136,31 @@ const Ocr = (() => {
     return { x: x + bx, y: y + by, w: bw2, h: bh2 };
   }
 
+  // Зі знижкою в рамці дві ціни: «216,000 270,000» (стара закреслена). Розряди розділені тими ж
+  // пробілами чи комами, тож регулярний вираз склеює їх в одне число. Беремо групи по черзі, доки
+  // кожна — рівно 3 цифри з тим самим розділювачем і ціна не довша за 7 цифр (дорожче 9 999 999
+  // вантажів не буває): це й є поточна ціна.
+  function firstPrice(text) {
+    const parts = [...text.matchAll(/(\d+)([ ,.]?)/g)];
+    let digits = parts[0][1];
+    const sep = parts[0][2];
+    for (let i = 1; i < parts.length; i++) {
+      const [, g] = parts[i];
+      if (g.length !== 3 || parts[i - 1][2] !== sep || (digits + g).length > 7) break;
+      digits += g;
+    }
+    return +digits;
+  }
+
   // З тексту рамки: назва вантажу (з прямокутником її рядка) і ціна.
   // Ціна — число з групами розрядів: «110,000», «470 000».
-  function parseTip(data) {
+  function parseTip(data, k = TIP_SCALE) {
     const lines = (data.lines || []).map(l => ({ text: l.text.trim(), bbox: l.bbox, words: l.words }));
     let price = 0, priceAt = -1;
     lines.forEach((l, i) => {
       if (price) return;
       const m = l.text.replace(/[oO]/g, '0').match(/(\d{1,3}(?:[ ,.]\d{3})+|\d{4,7})/);
-      if (m) { price = +m[1].replace(/\D/g, ''); priceAt = i; }
+      if (m) { price = firstPrice(m[1]); priceAt = i; }
     });
     if (!price || price < 1000) return null;
     // Назва в рамці — рядок одразу над ціною. Вище можуть потрапити написи сусідніх вантажів у сітці,
@@ -156,14 +179,14 @@ const Ocr = (() => {
         ? { x0: Math.min(...words.map(wd => wd.bbox.x0)), y0: Math.min(...words.map(wd => wd.bbox.y0)), x1: Math.max(...words.map(wd => wd.bbox.x1)), y1: Math.max(...words.map(wd => wd.bbox.y1)) }
         : above.bbox;
     }
-    const scale = b => ({ x0: b.x0 / TIP_SCALE, y0: b.y0 / TIP_SCALE, x1: b.x1 / TIP_SCALE, y1: b.y1 / TIP_SCALE });
+    const scale = b => ({ x0: b.x0 / k, y0: b.y0 / k, x1: b.x1 / k, y1: b.y1 / k });
     return { price, label, labelBox: labelBox && scale(labelBox), priceBox: scale(priceBox) };
   }
 
   // Напис вантажу у верхній частині комірки: вирізаємо, збільшуємо й інвертуємо (темний текст на
   // світлому Tesseract читає краще). src — кадр, x/y/w/h — прямокутник вантажу в ньому.
   function labelCanvas(src, x, y, w, h, P) {
-    const lh = Math.min(h, P * 0.75), k = 3;
+    const lh = Math.min(h, P * 0.75), k = Math.min(4, Math.max(2, 192 / P)); // при 64 px — утричі
     const c = document.createElement('canvas');
     c.width = Math.round((w - 4) * k); c.height = Math.round((lh - 4) * k);
     const ctx = c.getContext('2d');
@@ -191,7 +214,8 @@ const Ocr = (() => {
   // Назва предмета може бути обрізана краєм панелі. Повертає { nick, price, item } або null.
   function parseFeed(text) {
     const s = text.replace(/\s+/g, ' ');
-    const m = s.match(/(\S+)\s+spent\s+([\d][\d ,.oO]*\d)\s*K\w*\s+on\b.*?obtain\w*\s*[\[({|]?\s*([^\]\)}|]+)/i);
+    // «obtained» на малій роздільності читається як «obloned», «obtomed» — досить «ob…» або дужки
+    const m = s.match(/(\S+)\s+spent\s+([\d][\d ,.oO]*\d)\s*K\w*\s+on\b.*?(?:\bob\w*|(?=[\[({]))\s*[\[({|]?\s*([^\]\)}|]+)/i);
     if (!m) return null;
     const price = +m[2].replace(/[oO]/g, '0').replace(/\D/g, '');
     const item = m[3].replace(/[^A-Za-z0-9 .\-'&]/g, '').trim();
