@@ -8,15 +8,22 @@ param([string]$Root = $PSScriptRoot)
 $BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'
 $FORM_POST   = 'https://docs.google.com/forms/d/e/1FAIpQLScEQr6lGVb0-fzTCv2SwBMrOyQqU-vlUyQY1zf_exOF9479RQ/formResponse'
 $FORM_FIELD  = 'entry.1614546192'
-$SHEET_CSV   = ''   # таблиця відповідей форми — лише в автора, у локальному author.json (не в git)
 $BATCH       = 25   # стільки покупок в одній відповіді форми
 $UA          = 'abi-kaluvan-sync'
 
 $baseFile = Join-Path $Root 'library\purchases.json'
 $sentFile = Join-Path $Root '.purchases-sent.json'
 $isAuthor = Test-Path (Join-Path $Root '.git')
-$authorFile = Join-Path $Root 'author.json'
-if ($isAuthor -and (Test-Path $authorFile)) { try { $SHEET_CSV = [string](Get-Content $authorFile -Raw -Encoding UTF8 | ConvertFrom-Json).sheetCsv } catch {} }
+
+# Секрети автора — у .env поруч (не в git): KEY=VALUE, рядки з # — коментарі
+$envVars = @{}
+$envFile = Join-Path $Root '.env'
+if (Test-Path $envFile) {
+  foreach ($line in Get-Content $envFile -Encoding UTF8) {
+    if ($line -match '^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$') { $envVars[$Matches[1]] = $Matches[2] }
+  }
+}
+$SHEET_CSV = if ($isAuthor) { [string]$envVars['SHEET_CSV'] } else { '' } # таблиця відповідей форми
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Key($e) { "$($e.t)|$($e.itemId)|$($e.price)" }
