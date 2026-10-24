@@ -5,7 +5,7 @@
 param([string]$Root = $PSScriptRoot)
 
 $BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'
-$WORKER      = ''   # адреса Worker'а (…/submit); порожньо — свої покупки поки не відправляємо
+$WORKER      = 'https://abi-kaluvan.kaluvan-tools.workers.dev/submit'   # сервер спільної бази (worker/worker.js)
 $BATCH       = 25   # стільки покупок в одному запиті (Worker більше не приймає)
 $UA          = 'abi-kaluvan-sync'
 
