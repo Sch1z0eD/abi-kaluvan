@@ -266,7 +266,7 @@ namespace AbiEar
             using (var ms = new MemoryStream())
             {
                 var prm = new System.Drawing.Imaging.EncoderParameters(1);
-                prm.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 85L);
+                prm.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L);
                 bmp.Save(ms, jpeg, prm);
                 return ms.ToArray();
             }
@@ -407,7 +407,7 @@ namespace AbiEar
         }
 
         // Кадри екрана — лише поки сторінка їх чекає. Знімок і стиснення в JPEG ідуть паралельно
-        // у двох потоках: кожне займає ~15 мс, разом — до 30 кадрів на секунду.
+        // у двох потоках (правої половини вікна — ~8 і ~3 мс): до 30 кадрів на секунду.
         static System.Drawing.Bitmap pending;    // знятий, але ще не стиснутий кадр
         static string screenState = "start";     // game | nogame | minimized
 
@@ -421,7 +421,9 @@ namespace AbiEar
             foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
         }
 
-        static string ScreenStateJson() { return "{\"type\":\"screen\",\"state\":\"" + screenState + "\"}"; }
+        // crop: кадр — уже права частина вікна (торговець завжди справа), сторінці не треба різати ще раз
+        const double MERCHANT_SIDE = 0.5;
+        static string ScreenStateJson() { return "{\"type\":\"screen\",\"state\":\"" + screenState + "\",\"crop\":" + MERCHANT_SIDE.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}"; }
         static readonly AutoResetEvent hasPending = new AutoResetEvent(false);
 
         // Знімаємо лише робочу область вікна гри: інші монітори й програми в кадр не потрапляють
@@ -450,7 +452,9 @@ namespace AbiEar
                 if (screenState != "game") { Thread.Sleep(500); continue; }
                 try
                 {
-                    var bmp = Screen.Capture(area);
+                    // лише права частина вікна: там торговець; ліву половину знімати й стискати даремно
+                    int cut = (int)Math.Round(area.Width * MERCHANT_SIDE);
+                    var bmp = Screen.Capture(new System.Drawing.Rectangle(area.X + cut, area.Y, area.Width - cut, area.Height));
                     // якщо попередній ще не стиснули — замінюємо його свіжим, черга не росте
                     var old = Interlocked.Exchange(ref pending, bmp);
                     if (old != null) old.Dispose();

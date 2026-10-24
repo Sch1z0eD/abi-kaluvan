@@ -236,8 +236,8 @@ const OCC_GREY = 0.3;        // частка «сірого» в комірці,
 const PICK_MIN_DIFF = 4;     // мінімальна зміна вантажу (0–255), щоб вважати його потягнутим
 const RED_MIN = 3;           // мінімальна «червоність» сліду на місці потягнутого вантажу
 const MAP_U = 56;            // розмір одиниці на схемі
-const SCAN_MS = 250;         // як часто розбирати сітку, коли схема готова
-const SCAN_FAST_MS = 60;     // і під час скану: кожен вантаж має встигнути набрати голоси, поки його видно
+const SCAN_MS = 150;         // як часто розбирати сітку, коли схема готова (рамку з ціною помічаємо швидше)
+const SCAN_FAST_MS = 45;     // і під час скану: кожен вантаж має встигнути набрати голоси, поки його видно
 const QUIET_MS = 1500;       // стільки після звуку картинка вважається «брудною» (вантаж тягнуть)
 const REOPEN_MS = 5000;      // під час скану сітки не видно довше — торговця закрили, скан наново
 const FREEZE_STABLE = 3;     // стільки розборів без нових вантажів — і схема готова
@@ -499,6 +499,7 @@ function startNativeScreen() {
     if (typeof e.data === 'string') {
       const m = JSON.parse(e.data);
       if (m.type !== 'screen') return;
+      frameCropped = !!m.crop;
       if (m.black) log(tr('log.black'));
       if (m.state === 'nogame') log(tr('log.nogame'));
       else if (m.state === 'minimized') log(tr('log.minimized'));
@@ -822,7 +823,9 @@ function startVideo(track) {
 
 // Сітку торговця шукаємо в правій половині вікна гри: торговець завжди справа, а зліва — власні
 // кишені й рюкзак гравця з такими самими клітинками
+let frameCropped = false; // сервер уже шле лише праву частину вікна (див. helper.cs)
 function regionPx(w, h) {
+  if (frameCropped) return { x: 0, y: 0, w, h };
   return { x: Math.round(w * MERCHANT_SIDE), y: 0, w: w - Math.round(w * MERCHANT_SIDE), h };
 }
 
