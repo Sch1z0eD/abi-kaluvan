@@ -1472,8 +1472,8 @@ async function loadBase() {
   drawMap();
 }
 
-// Свої покупки самі йдуть у спільну базу (library/purchases.json через локальний сервер), а сервер
-// автора сам заливає її на GitHub. Нічого натискати не треба; без сервера (сайт не через start.bat) — тихо пропускаємо.
+// Свої покупки самі йдуть у локальну базу (library/purchases.json через локальний сервер), а звідти
+// при наступному запуску sync.ps1 шле їх на спільний сервер. Без сервера (сайт не через start.bat) — тихо пропускаємо.
 let syncBusy = false;
 const SHARE_LABELS = new Set(['', ...Object.values(MYSTERY_TIERS).map(t => t.name), 'Military Items', 'Medical Supplies', 'Computer Parts',
   'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials', 'Electronics', 'Flammables', 'Tools', 'Paper']);
@@ -1482,24 +1482,17 @@ function shareable(b) {
   if (!b.soundId || !it) return null;
   return { t: b.t, soundId: b.soundId, size: b.size || '', label: SHARE_LABELS.has(b.label) ? b.label : '', price: b.price || 0, itemId: b.itemId, item: it.nameEn || '', q: it.q || '' };
 }
-async function syncBase(force = false) {
-  const baseKeys = new Set(basePurchases.map(purchaseKey));
-  if (syncBusy || !location.protocol.startsWith('http') || (!force && !purchases.some(b => !baseKeys.has(purchaseKey(b))))) return;
+async function syncBase() {
+  if (syncBusy || !location.protocol.startsWith('http')) return;
   syncBusy = true;
   // У спільну базу — без вільного тексту: назва предмета з довідника, напис — лише відомий.
   // Так туди ніяк не потрапить нік чи інший шматок рядка з екрана.
-  const merged = mergePurchases(basePurchases, purchases.map(shareable).filter(Boolean));
+  const mine = purchases.map(shareable).filter(Boolean);
   try {
-    const r = await fetch('api/purchases', {
+    await fetch('api/purchases', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Abi-Kaluvan': '1' },
-      body: JSON.stringify({ updated: new Date().toISOString(), purchases: merged }, null, 1),
+      body: JSON.stringify({ updated: new Date().toISOString(), purchases: mine }, null, 1),
     });
-    if (r.ok) {
-      basePurchases = merged;
-      allCache = null;
-      renderPurchases();
-      log(tr('log.shared', { n: merged.length }));
-    }
   } catch {} finally { syncBusy = false; }
 }
 
@@ -2001,7 +1994,7 @@ $('buys').addEventListener('click', e => {
   basePurchases = basePurchases.filter(b => String(b.t) !== btn.dataset.del);
   savePurchases();
   renderPurchases();
-  syncBase(true);
+  syncBase();
 });
 $('btnBuysClear').onclick = () => {
   if (!purchases.length || !confirm(tr('buys.clearAsk'))) return;

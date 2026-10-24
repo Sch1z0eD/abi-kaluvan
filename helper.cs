@@ -305,9 +305,6 @@ namespace AbiEar
             var s = new Thread(delegate () { ScreenLoop(exe); });
             s.IsBackground = true;
             s.Start();
-            var g = new Thread(PushLoop);
-            g.IsBackground = true;
-            g.Start();
             while (listener.IsListening)
             {
                 var ctx = listener.GetContext();
@@ -343,8 +340,8 @@ namespace AbiEar
             res.Close();
         }
 
-        // Спільна база покупок: сторінка надсилає вже обʼєднаний список, ми лише записуємо його в
-        // library/purchases.json (звідти його беруть усі, хто скачає програму). Свій заголовок обовʼязковий:
+        // Свої покупки: сторінка надсилає їх список, ми записуємо його в purchases.mine.json (не в git),
+        // а sync.ps1 при запуску шле звідти нові покупки на Worker. Свій заголовок обовʼязковий:
         // з чужого сайту браузер такий запит без дозволу CORS не надішле, тож файл не перезапише ніхто сторонній.
         const int PURCHASES_MAX = 8 * 1024 * 1024;
         static void SavePurchases(HttpListenerContext ctx)
@@ -356,57 +353,13 @@ namespace AbiEar
             using (var reader = new StreamReader(req.InputStream, Encoding.UTF8)) body = reader.ReadToEnd();
             string trimmed = body.TrimStart();
             if (!trimmed.StartsWith("{") || body.IndexOf("\"purchases\"", StringComparison.Ordinal) < 0) { res.StatusCode = 400; res.Close(); return; }
-            string file = Path.Combine(root, "library", "purchases.json");
+            string file = Path.Combine(root, "purchases.mine.json");
             string tmp = file + ".tmp";
             File.WriteAllText(tmp, body, new UTF8Encoding(false));
             if (File.Exists(file)) File.Delete(file);
             File.Move(tmp, file);
-            pushPending = true;
             res.StatusCode = 204;
             res.Close();
-        }
-
-        // Якщо програма лежить у git-репозиторії автора (є папка .git), база сама йде на GitHub:
-        // комітимо лише library/purchases.json і пушимо, не частіше ніж раз на PUSH_EVERY_MS.
-        // Звідти її підтягують усі, хто має програму. У звичайної копії (з архіву релізу) .git немає — нічого не робимо.
-        const int PUSH_EVERY_MS = 5 * 60 * 1000;
-        static volatile bool pushPending = true; // при запуску теж: база могла змінитись, коли сервер закрили до пушу
-        static void PushLoop()
-        {
-            DateTime last = DateTime.MinValue;
-            while (true)
-            {
-                Thread.Sleep(30 * 1000);
-                if (!pushPending || (DateTime.Now - last).TotalMilliseconds < PUSH_EVERY_MS) continue;
-                if (!Directory.Exists(Path.Combine(root, ".git"))) { pushPending = false; continue; }
-                pushPending = false;
-                try
-                {
-                    Git("add -- library/purchases.json");
-                    if (Git("diff --cached --quiet -- library/purchases.json") == 0) continue; // нічого нового
-                    last = DateTime.Now;
-                    Git("commit -m \"Update shared purchases base\" -- library/purchases.json");
-                    int code = Git("push");
-                    Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + (code == 0 ? "  спільну базу покупок залито на GitHub" : "  не вдалося залити базу на GitHub (git push), спробую пізніше"));
-                    if (code != 0) pushPending = true;
-                }
-                catch (Exception e) { Console.WriteLine("git: " + e.Message); }
-            }
-        }
-
-        static int Git(string args)
-        {
-            var psi = new ProcessStartInfo("git", "-C \"" + root + "\" " + args)
-            {
-                UseShellExecute = false, CreateNoWindow = true,
-                RedirectStandardOutput = true, RedirectStandardError = true,
-            };
-            using (var p = Process.Start(psi))
-            {
-                p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd();
-                p.WaitForExit();
-                return p.ExitCode;
-            }
         }
 
         static void Audio(HttpListenerContext ctx)

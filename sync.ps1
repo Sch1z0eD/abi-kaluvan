@@ -1,29 +1,18 @@
-﻿# Синхронізація спільної бази покупок (library/purchases.json) при запуску, одразу після перевірки оновлень.
-#  - кожен: база з GitHub (прод) зливається з локальною (туди сайт пише свої покупки);
-#  - гравець: свої нові покупки анонімно йдуть у Google Форму (без ніка — його в записах нема);
-#  - автор (папка — git-клон): забирає записи з таблиці форми, перевіряє й вливає в базу,
-#    а сервер потім сам комітить і пушить її на GitHub.
+﻿# Синхронізація спільної бази покупок (library/purchases.json) при запуску, одразу після перевірки оновлень:
+#  - база з GitHub зливається з локальною (туди сайт пише свої покупки);
+#  - свої нові покупки йдуть на сервер спільної бази (Cloudflare Worker, код у worker/worker.js).
+#    Він перевіряє їх і сам дописує базу на GitHub; токен GitHub є лише в нього, тут нічого секретного.
 param([string]$Root = $PSScriptRoot)
 
 $BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'
-$FORM_POST   = 'https://docs.google.com/forms/d/e/1FAIpQLScEQr6lGVb0-fzTCv2SwBMrOyQqU-vlUyQY1zf_exOF9479RQ/formResponse'
-$FORM_FIELD  = 'entry.1614546192'
-$BATCH       = 25   # стільки покупок в одній відповіді форми
+$WORKER      = ''   # адреса Worker'а (…/submit); порожньо — свої покупки поки не відправляємо
+$BATCH       = 25   # стільки покупок в одному запиті (Worker більше не приймає)
 $UA          = 'abi-kaluvan-sync'
 
 $baseFile = Join-Path $Root 'library\purchases.json'
+$mineFile = Join-Path $Root 'purchases.mine.json'   # свої покупки (пише сайт, не в git)
 $sentFile = Join-Path $Root '.purchases-sent.json'
-$isAuthor = Test-Path (Join-Path $Root '.git')
-
-# Секрети автора — у .env поруч (не в git): KEY=VALUE, рядки з # — коментарі
-$envVars = @{}
-$envFile = Join-Path $Root '.env'
-if (Test-Path $envFile) {
-  foreach ($line in Get-Content $envFile -Encoding UTF8) {
-    if ($line -match '^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$') { $envVars[$Matches[1]] = $Matches[2] }
-  }
-}
-$SHEET_CSV = if ($isAuthor) { [string]$envVars['SHEET_CSV'] } else { '' } # таблиця відповідей форми
+$isClone = Test-Path (Join-Path $Root '.git')        # git-клон (автор): файл бази в git не чіпаємо, його веде Worker
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Key($e) { "$($e.t)|$($e.itemId)|$($e.price)" }
@@ -98,6 +87,7 @@ function Merge([object[]]$lists) {
 try {
   $pairs = ValidPairs
   $local = if (Test-Path $baseFile) { ReadList (Get-Content $baseFile -Raw -Encoding UTF8) } else { @() }
+  $mine = if (Test-Path $mineFile) { ReadList (Get-Content $mineFile -Raw -Encoding UTF8) } else { @() }
   $remote = @()
   $online = $true
   try { $remote = ReadList (Fetch $BASE_REMOTE 6) }
@@ -106,55 +96,40 @@ try {
     $resp = $_.Exception.Response
     if (-not ($resp -and [int]$resp.StatusCode -eq 404)) { $online = $false }
   }
-  $incoming = @()
 
-  if ($isAuthor -and $SHEET_CSV -and $online) {
-    # записи гравців із таблиці форми: у кожному рядку — JSON зі списком покупок
-    try {
-      $csv = Fetch $SHEET_CSV 8
-      foreach ($row in ($csv | ConvertFrom-Csv)) {
-        $cell = @($row.PSObject.Properties.Value)[1]
-        $list = @(ReadList $cell)
-        if ($list.Count -gt $BATCH) { continue } # програма шле не більше $BATCH за раз — більше підробка
-        foreach ($e in $list) { $c = Clean $e $pairs; if ($c) { $incoming += [pscustomobject]$c } }
-      }
-    } catch { Write-Host "Таблицю покупок гравців не вдалося прочитати: $($_.Exception.Message)" -ForegroundColor DarkYellow }
-  }
-
-  # у спільну базу — лише очищені записи (і свої теж: там може бути розпізнаний з екрана текст)
+  # у спільну базу — лише очищені записи (свої теж: там може бути розпізнаний з екрана текст)
   $cleanAll = { param($list) @($list | ForEach-Object { Clean $_ $pairs } | Where-Object { $_ } | ForEach-Object { [pscustomobject]$_ }) }
-  $merged = @(Merge @(@(& $cleanAll $remote), @(& $cleanAll $local), $incoming))
+  $merged = @(Merge @(@(& $cleanAll $remote), @(& $cleanAll $local), @(& $cleanAll $mine)))
   $remoteKeys = @{}; foreach ($e in $remote) { $remoteKeys[(Key $e)] = $true }
   $localKeys = @{}; foreach ($e in $local) { $localKeys[(Key $e)] = $true }
   $added = @($merged | Where-Object { -not $localKeys.ContainsKey((Key $_)) }).Count
 
-  if (-not $isAuthor -and $online) {
-    # свої нові покупки — у форму; що вже відправили або вже є на GitHub, вдруге не шлемо
+  if ($WORKER -and $online) {
+    # свої нові покупки — на Worker; що вже відправили або вже є на GitHub, вдруге не шлемо
     $sent = @{}
     if (Test-Path $sentFile) { foreach ($k in (Get-Content $sentFile -Raw | ConvertFrom-Json)) { $sent[$k] = $true } }
     foreach ($k in $remoteKeys.Keys) { $sent[$k] = $true }
-    $todo = @($local | Where-Object { -not $sent.ContainsKey((Key $_)) } | ForEach-Object { Clean $_ $pairs } | Where-Object { $_ })
+    $todo = @($mine | Where-Object { -not $sent.ContainsKey((Key $_)) } | ForEach-Object { Clean $_ $pairs } | Where-Object { $_ })
     $done = 0
     for ($i = 0; $i -lt $todo.Count; $i += $BATCH) {
       $chunk = @($todo[$i..([Math]::Min($i + $BATCH, $todo.Count) - 1)])
-      $json = ConvertTo-Json -InputObject $chunk -Depth 3 -Compress
+      $json = ConvertTo-Json -InputObject ([ordered]@{ purchases = $chunk }) -Depth 4 -Compress
       try {
-        Invoke-WebRequest $FORM_POST -Method Post -Body @{ $FORM_FIELD = $json } -UseBasicParsing -TimeoutSec 8 -UserAgent $UA | Out-Null
+        $body = [Text.Encoding]::UTF8.GetBytes($json)
+        Invoke-WebRequest $WORKER -Method Post -Body $body -ContentType 'application/json' -UseBasicParsing -TimeoutSec 15 -UserAgent $UA | Out-Null
         foreach ($e in $chunk) { $sent[(Key $e)] = $true }
         $done += $chunk.Count
-      } catch { break }
+      } catch { break } # ліміт запитів чи сервер недоступний — решту наступного разу
     }
     [IO.File]::WriteAllText($sentFile, (ConvertTo-Json -InputObject @($sent.Keys) -Compress), (New-Object Text.UTF8Encoding($false)))
     if ($done) { Write-Host "Твої покупки ($done) відправлено в спільну базу." -ForegroundColor Green }
   }
 
-  if ($added -gt 0 -or $merged.Count -ne $local.Count) {
+  if (-not $isClone -and ($added -gt 0 -or $merged.Count -ne $local.Count)) {
     $out = [ordered]@{ updated = [DateTime]::UtcNow.ToString('o'); purchases = @($merged) }
     [IO.File]::WriteAllText($baseFile, (ConvertTo-Json -InputObject $out -Depth 4), (New-Object Text.UTF8Encoding($false)))
   }
-  $fresh = @($incoming | Where-Object { -not $localKeys.ContainsKey((Key $_)) -and -not $remoteKeys.ContainsKey((Key $_)) }).Count
-  $from = if ($fresh) { ", нових від гравців: $fresh" } else { '' }
-  Write-Host "Спільна база покупок: $($merged.Count)$from." -ForegroundColor DarkGray
+  Write-Host "Спільна база покупок: $($merged.Count)." -ForegroundColor DarkGray
 } catch {
   Write-Host "Синхронізація бази покупок не вдалася: $($_.Exception.Message)" -ForegroundColor DarkYellow
 }
