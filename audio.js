@@ -1,33 +1,33 @@
 'use strict';
-// Звук: розпізнавання звуків «взяв/поклав» за точними сэмплами гри. Без DOM.
+// Sound: recognizing "pick up / put down" sounds by the exact game samples. No DOM.
 //
-// Гра (Wwise) на кожну групу предметів програє один і той самий сэмпл, без випадкової зміни висоти.
-// Тому звук шукаємо як точний зразок: нормована взаємна кореляція (NCC) форми хвилі з еталоном.
-//  * Сигнал ділиться на 5 частотних смуг. Збіг рахується в кожній смузі окремо й складається з вагами
-//    «скільки енергії еталона в цій смузі»: голос і гул унизу не заважають впізнати дзвінкий метал
-//    угорі, а еквалайзер, що міняє гучність смуг, не ламає порівняння.
-//  * Другий, «нижній» бал — лише смуги до 4.5 кГц. Береться кращий із двох: якщо верх зіпсований
-//    (стиснення, приглушення в грі), рятує низ.
-//  * Порівнюємо лише перші MATCH_SEC еталона й лише коли почався гучний звук: тоді вистачає одного
-//    FFT-проходу на звук, а не безперервного сканування.
-// Підхід і налаштування (смуги, 24 кГц, 0.2 с еталона, поріг 0.5) — як у програмі «Прослушка».
+// The game (Wwise) plays the same sample for every item group, with no random pitch change.
+// So the sound is matched as an exact sample: normalized cross-correlation (NCC) of the waveform with a template.
+//  * The signal is split into 5 frequency bands. The match is computed per band and summed with weights
+//    "how much of the template's energy is in this band": voice and rumble down low do not hide a ringing metal
+//    sound up high, and an equalizer that changes band volumes does not break the comparison.
+//  * A second, "low" score uses only the bands up to 4.5 kHz. The better of the two is taken: if the top is damaged
+//    (compression, muffling in the game), the bottom saves it.
+//  * Only the first MATCH_SEC of a template is compared, and only when a loud sound starts: then one
+//    FFT pass per sound is enough instead of continuous scanning.
+// The approach and settings (bands, 24 kHz, 0.2 s template, threshold 0.5) follow the "Proslushka" app.
 const Ear = (() => {
-  const SAMPLE_RATE = 48000;   // вхід: і живий звук, і бібліотека
+  const SAMPLE_RATE = 48000;   // input: both live sound and the library
   const DECIM = 2;
-  const SR = SAMPLE_RATE / DECIM; // смуги після фільтрів — 24 кГц
+  const SR = SAMPLE_RATE / DECIM; // bands after the filters — 24 kHz
   const BANDS = [[40, 900], [900, 2500], [2500, 4500], [4500, 8000], [8000, 11500]];
   const LF_MAX_HZ = 4500;
-  const MATCH_SEC = 0.2;       // скільки початку еталона порівнюємо
-  const PAST_SEC = 0.1;        // вікно пошуку до початку звуку
-  const FUTURE_SEC = 0.35;     // і після нього (з еталоном має влізти в одне FFT)
-  const MIN_W = 0.03;          // смуга з меншою часткою енергії еталона не враховується
-  const BLOCK = 240;           // 10 мс при 24 кГц: крок пошуку початку звуку
-  const RETRIGGER_SEC = 0.12;  // новий звук не раніше
-  const MIN_LEVEL_DB = -62;    // тихіші звуки не розглядаємо
+  const MATCH_SEC = 0.2;       // how much of the template start is compared
+  const PAST_SEC = 0.1;        // search window before the sound start
+  const FUTURE_SEC = 0.35;     // and after it (together with the template it must fit into one FFT)
+  const MIN_W = 0.03;          // a band with a smaller share of the template energy is ignored
+  const BLOCK = 240;           // 10 ms at 24 kHz: step of the sound start search
+  const RETRIGGER_SEC = 0.12;  // a new sound not earlier than this
+  const MIN_LEVEL_DB = -62;    // quieter sounds are ignored
   const RING_SEC = 3;
   const DEFAULT_THRESHOLD = 0.5;
 
-  // ---- фільтри: Баттерворт 4-го порядку як два біквади (RBJ), окремо ФВЧ і ФНЧ ----
+  // ---- filters: 4th-order Butterworth as two biquads (RBJ), separate high-pass and low-pass ----
   const BUTTER4_Q = [0.5411961, 1.3065630];
   function biquad(type, f, q, fs) {
     const w = 2 * Math.PI * f / fs, cw = Math.cos(w), al = Math.sin(w) / (2 * q);
@@ -43,7 +43,7 @@ const Ear = (() => {
   }
   const SECTIONS = BANDS.map(bandSections);
 
-  // Банк фільтрів зі станом (для потоку): 48 кГц моно -> 5 смуг по 24 кГц
+  // Filter bank with state (for a stream): 48 kHz mono -> 5 bands at 24 kHz
   function makeBank() {
     const state = SECTIONS.map(secs => secs.map(() => ({ z1: 0, z2: 0 })));
     let phase = 0;
@@ -72,7 +72,7 @@ const Ear = (() => {
     };
   }
 
-  // ---- FFT: комплексний radix-2 з кешем таблиць ----
+  // ---- FFT: complex radix-2 with cached tables ----
   const fftTables = new Map();
   function tables(n) {
     let t = fftTables.get(n);
@@ -85,7 +85,7 @@ const Ear = (() => {
     fftTables.set(n, t);
     return t;
   }
-  // inverse=false: X[k] = Σ x[n] e^{-2πikn/N}; inverse=true — без ділення на N
+  // inverse=false: X[k] = Σ x[n] e^{-2πikn/N}; inverse=true — without dividing by N
   function fft(re, im, inverse) {
     const n = re.length, { rev, cos, sin } = tables(n), sg = inverse ? 1 : -1;
     for (let i = 0; i < n; i++) {
@@ -109,13 +109,13 @@ const Ear = (() => {
   let NFFT = 1;
   while (NFFT < WIN_LEN + MATCH_LEN) NFFT <<= 1;
 
-  // ---- еталон ----
-  // wave48 — моно 48 кГц. Повертає { L, w, wlf, spec } або null (тиша).
+  // ---- template ----
+  // wave48 — mono 48 kHz. Returns { L, w, wlf, spec } or null (silence).
   function makeTemplate(wave48) {
-    const pad = new Float32Array(wave48.length + SAMPLE_RATE / 10); // хвіст, щоб фільтри «доспівали»
+    const pad = new Float32Array(wave48.length + SAMPLE_RATE / 10); // a tail so the filters ring out
     pad.set(wave48);
     const bands = makeBank()(pad);
-    // початок звуку — де сумарна амплітуда вперше доходить до 5% максимуму
+    // the sound start is where the summed amplitude first reaches 5% of the maximum
     const len = bands[0].length, full = new Float32Array(len);
     let peak = 0;
     for (let i = 0; i < len; i++) { let s = 0; for (const b of bands) s += b[i]; full[i] = Math.abs(s); if (full[i] > peak) peak = full[i]; }
@@ -135,7 +135,7 @@ const Ear = (() => {
     const lfIdx = BANDS.map(([, hi], i) => (hi <= LF_MAX_HZ ? i : -1)).filter(i => i >= 0);
     const elf = lfIdx.reduce((a, i) => a + (w[i] ? e[i] : 0), 0);
     const wlf = BANDS.map((_, i) => (lfIdx.includes(i) && w[i] && elf > total * 0.02 ? e[i] / elf : 0));
-    // спектри нормованих смуг еталона (спряжені — для кореляції)
+    // spectra of the normalized template bands (conjugated, for correlation)
     const spec = seg.map((s, b) => {
       if (!w[b] && !wlf[b]) return null;
       const norm = Math.sqrt(e[b]) || 1;
@@ -148,11 +148,11 @@ const Ear = (() => {
     return { L, w, wlf, spec };
   }
 
-  // ---- порівняння вікна з еталонами ----
-  // win — 5 смуг по WIN_LEN відліків. tpls — [{ id, kind, tpl }]. Повертає [{ id, kind, score }] за спаданням.
+  // ---- matching a window against templates ----
+  // win — 5 bands of WIN_LEN samples. tpls — [{ id, kind, tpl }]. Returns [{ id, kind, score }], best first.
   function match(win, tpls) {
     const N = win[0].length;
-    // спектри смуг вікна і ковзна енергія (через накопичені суми)
+    // band spectra of the window and the sliding energy (via cumulative sums)
     const ws = win.map(x => {
       const re = new Float32Array(NFFT), im = new Float32Array(NFFT);
       re.set(x.subarray(0, Math.min(N, NFFT)));
@@ -168,7 +168,7 @@ const Ear = (() => {
       const npos = N - L + 1;
       if (npos < 1) continue;
       const full = new Float32Array(npos), low = new Float32Array(npos);
-      // Кореляції дійсні, тож дві смуги рахуємо одним зворотним FFT: P1 + i·P2 -> corr1 + i·corr2
+      // The correlations are real, so two bands share one inverse FFT: P1 + i·P2 -> corr1 + i·corr2
       const used = spec.map((s, b) => (s ? b : -1)).filter(b => b >= 0);
       for (let u = 0; u < used.length; u += 2) {
         const b1 = used[u], b2 = used[u + 1];
@@ -204,20 +204,20 @@ const Ear = (() => {
     return out.sort((a, b) => b.score - a.score);
   }
 
-  // ---- потік: шукає початок звуку і віддає вікно смуг навколо нього ----
-  // opts: sens() — поріг над фоном, дБ; muted(); onWindow(win, msAgo) — msAgo: скільки мс тому почався
-  //       звук; onRaw(wave48, msAgo) — те саме, але сирий звук 48 кГц (для запису своїх еталонів);
-  //       onLevel(db, triggered) — для малювання
+  // ---- stream: finds a sound start and hands over the band window around it ----
+  // opts: sens() — threshold above the background, dB; muted(); onWindow(win, msAgo) — msAgo: how many ms ago
+  //       the sound started; onRaw(wave48, msAgo) — the same with raw 48 kHz sound (for recording own templates);
+  //       onLevel(db, triggered) — for drawing
   function makeStream(opts) {
     const bank = makeBank();
     const ringLen = Math.round(RING_SEC * SR), rawLen = Math.round(RING_SEC * SAMPLE_RATE);
     const ring = BANDS.map(() => new Float32Array(ringLen)), raw = new Float32Array(rawLen);
-    let total = 0, rawTotal = 0;   // скільки відліків уже записано (24 кГц і 48 кГц)
-    // Початок звуку шукаємо в кожній смузі окремо: дзвінкий метал видно вгорі, навіть коли низ
-    // забитий музикою чи голосом
+    let total = 0, rawTotal = 0;   // how many samples were written so far (24 kHz and 48 kHz)
+    // The sound start is searched in every band separately: a ringing metal sound is visible up high even when
+    // the bottom is flooded with music or voice
     const blockE = BANDS.map(() => 0), floor = BANDS.map(() => null);
     let blockN = 0, lastTrig = -Infinity;
-    const pending = [];             // відліки (24 кГц), де почався звук і чекаємо хвіст
+    const pending = [];             // samples (24 kHz) where a sound started and we wait for its tail
 
     function slice(buf, len, end, n) {
       const out = new Float32Array(n);
@@ -243,13 +243,13 @@ const Ear = (() => {
             level = Math.max(level, db);
             if (floor[b] === null) floor[b] = db;
             if (ready && db > floor[b] + sens && db > MIN_LEVEL_DB) trig = true;
-            else floor[b] += (db - floor[b]) * (db < floor[b] ? 0.2 : 0.01); // фон: вниз швидко, вгору повільно
+            else floor[b] += (db - floor[b]) * (db < floor[b] ? 0.2 : 0.01); // background: falls fast, rises slowly
           }
           blockN = 0;
           if (trig) { lastTrig = total; pending.push(total - BLOCK); }
           if (opts.onLevel) opts.onLevel(level, trig);
         }
-        // вікно готове, коли після початку звуку минуло FUTURE_SEC
+        // the window is ready when FUTURE_SEC has passed since the sound start
         while (pending.length && total - pending[0] >= FUTURE_SEC * SR) {
           const at = pending.shift();
           const end = at + Math.round(FUTURE_SEC * SR);
@@ -265,7 +265,7 @@ const Ear = (() => {
     };
   }
 
-  // Еталон зі звукового файлу. ctx має працювати на SAMPLE_RATE. Повертає { tpl, dur } або null.
+  // A template from a sound file. ctx must run at SAMPLE_RATE. Returns { tpl, dur } or null.
   async function fileTemplate(arrayBuffer, ctx) {
     const audio = await ctx.decodeAudioData(arrayBuffer);
     const mono = new Float32Array(audio.length);
@@ -277,7 +277,7 @@ const Ear = (() => {
     return tpl && { tpl, dur: audio.duration };
   }
 
-  // Свої записи зберігаємо компактно: 16 біт у base64
+  // Own recordings are stored compactly: 16 bit in base64
   function encodeWave(f32) {
     const i16 = new Int16Array(f32.length);
     for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-1, Math.min(1, f32[i])) * 32767;

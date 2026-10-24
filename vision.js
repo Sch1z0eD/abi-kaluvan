@@ -1,14 +1,14 @@
 'use strict';
-// Розпізнавання сітки торговця на кадрі екрана. Чисті функції без DOM.
-// Сітка: чорні комірки з тонкими світлими рамками; предмет займає кілька одиниць,
-// а всередині предмета ліній між одиницями немає.
+// Merchant grid recognition on a screen frame. Pure functions, no DOM.
+// The grid: black cells with thin light borders; an item spans several cells,
+// and there are no lines between the cells inside an item.
 const Vision = (() => {
-  const LINE_T = 10;        // наскільки лінія світліша за фон поруч
-  const MIN_RUN = 12;       // мінімальна довжина відрізка лінії для пошуку періоду
-  const EDGE_FILL = 0.55;   // частка межі, яку має покривати лінія (можна шматками)
-  const EDGE_RUN = 0.25;    // і хоча б один суцільний шматок такої довжини
-  const OCC_T = 40;         // яскравість, з якої піксель вважається «вмістом»
-  const EDGE_REL = 0.6;     // межа вантажу — не слабша за таку частку від типової межі на кадрі (лінії всередині відкритого вантажу ~0.5)
+  const LINE_T = 10;        // how much brighter a line is than the background next to it
+  const MIN_RUN = 12;       // minimal line segment length for the period search
+  const EDGE_FILL = 0.55;   // share of an edge the line has to cover (may be in pieces)
+  const EDGE_RUN = 0.25;    // plus at least one solid piece of this length
+  const OCC_T = 40;         // brightness from which a pixel counts as "content"
+  const EDGE_REL = 0.6;     // a cargo border is at least this share of the frame's typical border (lines inside revealed cargo ~0.5)
 
   function toGray(data, w, h) {
     const g = new Uint8Array(w * h);
@@ -16,19 +16,19 @@ const Vision = (() => {
     return { w, h, g };
   }
 
-  // Наскільки піксель червоніший за інші канали (слід від потягнутого вантажу)
+  // How much redder a pixel is than the other channels (the trace of a dragged cargo)
   function redness(data, w, h) {
     const r = new Uint8Array(w * h);
     for (let i = 0; i < r.length; i++) r[i] = Math.max(0, data[i * 4] - Math.max(data[i * 4 + 1], data[i * 4 + 2]));
     return r;
   }
 
-  // Карти тонких світлих ліній: hr — горизонтальні, vr — вертикальні.
-  // Сусідів беремо на відстані 2–4 px: на великій роздільності чи після масштабування лінія товща.
-  // Лінія світліша за обидва боки; просто перепад (сірий вантаж → темний фон під списком) — не лінія.
-  // У карті — контраст лінії (0 — не лінія): відкритий через Intel вантаж має кольоровий фон, і на ньому
-  // видно лінії між клітинками всередині вантажу, але вдвічі слабші за справжні межі.
-  // roi { x0, y0, x1, y1 } — шукати лише в цьому прямокутнику (довкола вже знайденої сітки): утричі швидше
+  // Maps of thin light lines: hr — horizontal, vr — vertical.
+  // Neighbours are taken 2–4 px away: at high resolution or after scaling a line is thicker.
+  // A line is brighter than both sides; a plain step (grey cargo → dark background below the list) is not a line.
+  // The map holds the line contrast (0 — no line): cargo revealed via Intel has a colored background with
+  // visible lines between its cells, but they are about half as strong as real borders.
+  // roi { x0, y0, x1, y1 } — search only inside this rectangle (around the grid already found): 3x faster
   function lineMaps({ w, h, g }, roi) {
     const hr = new Uint8Array(w * h), vr = new Uint8Array(w * h);
     const D = 4;
@@ -50,7 +50,7 @@ const Vision = (() => {
     return { hr, vr };
   }
 
-  // Профілі: частка довгих відрізків ліній у кожному рядку / стовпці
+  // Profiles: share of long line segments in each row / column
   function profiles(w, h, { hr, vr }, minRun = MIN_RUN) {
     const H = new Float32Array(h), V = new Float32Array(w);
     for (let y = 0; y < h; y++) {
@@ -74,21 +74,21 @@ const Vision = (() => {
     return { H: maxFilter(H), V: maxFilter(V) };
   }
 
-  // Лише відрізки, не коротші за майже цілу клітинку: межі сітки такі завжди, а краї іконок і літер ні
+  // Only segments almost a whole cell long: grid borders always are, icon and letter edges are not
   function gridProfiles(w, h, maps, P) {
     return profiles(w, h, maps, Math.max(MIN_RUN, Math.round(P * 0.8)));
   }
 
-  // Розмір клітинки у два проходи: грубо, потім по довгих відрізках. На великій роздільності
-  // краї іконки в центрі клітинки дають «лінії» посередині, і перший прохід може вийти вдвічі меншим.
-  // Поріг 1.2 від грубої оцінки: якщо вона вдвічі менша, іконка (~0.55 клітинки) його не пройде.
+  // Cell size in two passes: rough, then from long segments only. At high resolution icon edges
+  // in the middle of a cell look like "lines" there, and the first pass may come out half as large.
+  // The 1.2 threshold of the rough estimate: if it is half the size, an icon (~0.55 cell) will not pass it.
   function detectPeriod(w, h, maps) {
     const P1 = findPeriod(profiles(w, h, maps));
     if (!P1) return null;
     return findPeriod(profiles(w, h, maps, Math.round(P1 * 1.2)), P1 * 0.9, P1 * 2.2) || P1;
   }
 
-  // Лінія може бути на піксель зсунута: беремо максимум із сусідами
+  // A line may be shifted by a pixel: take the max with the neighbours
   function maxFilter(p) {
     const out = new Float32Array(p.length);
     for (let i = 0; i < p.length; i++) out[i] = Math.max(p[i], p[i - 1] || 0, p[i + 1] || 0);
@@ -112,7 +112,7 @@ const Vision = (() => {
 
   function mean(p) { let s = 0; for (const v of p) s += v; return s / p.length; }
 
-  // Розмір одиниці сітки (у пікселях кадру)
+  // Grid cell size (in frame pixels)
   function findPeriod(prof, minP = 24, maxP = 220) {
     const { H, V } = prof;
     maxP = Math.min(maxP, H.length / 2, V.length / 2);
@@ -125,9 +125,9 @@ const Vision = (() => {
     return best && top > 0.05 ? best : null;
   }
 
-  // Бал періоду — сума перевищень над середнім у всіх «зубцях» гребінки. Сума, а не середнє:
-  // великий період має лише кілька зубців і не може виграти, влучивши в пару рамок панелі,
-  // а кратний період (×2) збирає лише половину ліній.
+  // Period score — the sum of excesses over the mean at all comb teeth. A sum, not a mean:
+  // a large period has only a few teeth and cannot win by hitting a couple of panel borders,
+  // and a multiple period (×2) collects only half of the lines.
   function periodScorer({ H, V }) {
     const eH = excess(H), eV = excess(V);
     return P => bestPhase(eH, P).score + bestPhase(eV, P).score;
@@ -138,7 +138,7 @@ const Vision = (() => {
     return p.map(v => v - m);
   }
 
-  // Положення сітки при відомому періоді
+  // Grid position for a known period
   function locate(prof, P) {
     const { H, V } = prof;
     const px = bestPhase(V, P).phase, py = bestPhase(H, P).phase;
@@ -152,17 +152,17 @@ const Vision = (() => {
     };
     const [c0, c1] = span(V, px), [r0, r1] = span(H, py);
     if (c1 - c0 < 1 || r1 - r0 < 1) return null;
-    // точний розмір: похибка навіть у 0.2 px на 9 клітинках зсуває перевірку меж повз лінії
+    // exact size: even a 0.2 px error over 9 cells moves the edge checks past the lines
     const fx = fitLines(V, px + c0 * P, P, c1 - c0), fy = fitLines(H, py + r0 * P, P, r1 - r0);
     const fits = [fx, fy].filter(Boolean);
     const Pf = fits.length ? fits.reduce((a, f) => a + f.P * f.n, 0) / fits.reduce((a, f) => a + f.n, 0) : P;
     const x0 = fx ? fx.x0 : px + c0 * P, y0 = fy ? fy.x0 : py + r0 * P;
-    // На малій роздільності (1280×720, 1280×1024) клітинка ~40 px, і навіть 0.2 px похибки на 9 колонок
-    // зсувають крайні лінії повз справжні. Тож кожну лінію окремо підтягуємо до піку поруч.
+    // At low resolution (1280×720, 1280×1024) a cell is ~40 px, and even 0.2 px of error over 9 columns
+    // moves the outer lines past the real ones. So every line is pulled to the peak next to it.
     return { P: Pf, x0, y0, cols: c1 - c0, rows: r1 - r0, xs: snapLines(V, x0, Pf, c1 - c0), ys: snapLines(H, y0, Pf, r1 - r0) };
   }
 
-  // Точні положення ліній k = 0..count: пік профілю біля x0 + k*P, а де піку не видно — розрахункове
+  // Exact line positions k = 0..count: the profile peak near x0 + k*P, or the computed one where no peak is seen
   function snapLines(p, x0, P, count) {
     const r = Math.max(2, Math.round(P * 0.06));
     const peaks = [];
@@ -181,7 +181,7 @@ const Vision = (() => {
     });
   }
 
-  // Знаходить справжні піки ліній біля очікуваних позицій start + k*P і підганяє пряму pos = x0 + k*P
+  // Finds the real line peaks near the expected positions start + k*P and fits the line pos = x0 + k*P
   function fitLines(p, start, P, count) {
     const pts = [];
     for (let k = 0; k <= count; k++) {
@@ -189,7 +189,7 @@ const Vision = (() => {
       let best = -1, bestV = 0;
       for (let x = e - 3; x <= e + 3; x++) if (p[x] > bestV) { bestV = p[x]; best = x; }
       if (best >= 0 && bestV > 0) {
-        // центр піку (лінія може бути 2 px завтовшки)
+        // peak center (a line may be 2 px thick)
         let s = 0, sw = 0;
         for (let x = best - 2; x <= best + 2; x++) if (p[x] >= bestV * 0.6) { s += x * p[x]; sw += p[x]; }
         pts.push([k, s / sw]);
@@ -204,9 +204,9 @@ const Vision = (() => {
     return { P: slope, x0: mx - slope * mk, n };
   }
 
-  // Чи є лінія вздовж межі. Довгий напис («Uncommon Mystery Cargo» у 4 рядки) перекриває рамку
-  // й рве її на шматки, тож дивимось на сумарне покриття, а не лише на найдовший шматок.
-  // minC — найменший контраст, що рахується.
+  // Whether there is a line along an edge. A long label ("Uncommon Mystery Cargo" in 4 lines) covers the border
+  // and tears it into pieces, so we look at the total coverage, not only at the longest piece.
+  // minC — the smallest contrast that counts.
   function edgeFill(map, w, x, y, len, horizontal, minC = 1) {
     let best = 0, run = 0, hits = 0;
     for (let i = 0; i < len; i++) {
@@ -222,7 +222,7 @@ const Vision = (() => {
     return best >= len * EDGE_RUN ? hits / len : 0;
   }
 
-  // Сила лінії вздовж межі: медіана найсильнішого контрасту поперек лінії в кожній точці, де вона є
+  // Line strength along an edge: the median of the strongest cross-line contrast at every point where it exists
   function edgeStrength(map, w, x, y, len, horizontal) {
     const vals = [];
     for (let i = 0; i < len; i++) {
@@ -235,15 +235,15 @@ const Vision = (() => {
     return vals[vals.length >> 1];
   }
 
-  // Предмети на кадрі: [{ c, r, w, h, occ }] в одиницях сітки (r від верхньої видимої лінії)
+  // Items in a frame: [{ c, r, w, h, occ }] in grid units (r from the top visible line)
   function segment(G, maps, grid) {
     const { w } = G;
     const { P, x0, y0, cols, rows } = grid;
     const X = c => (grid.xs && grid.xs[c] !== undefined ? grid.xs[c] : Math.round(x0 + c * P));
     const Y = r => (grid.ys && grid.ys[r] !== undefined ? grid.ys[r] : Math.round(y0 + r * P));
     const pad = Math.round(P * 0.12), len = Math.round(P) - 2 * pad;
-    // Типова межа — медіана сили всіх ліній сітки (переважно це межі вантажів і порожніх клітинок).
-    // Слабші за EDGE_REL від неї — лінії всередині відкритого вантажу, а не його межі.
+    // The typical border is the median strength of all grid lines (mostly cargo and empty cell borders).
+    // Lines weaker than EDGE_REL of it are lines inside a revealed cargo, not its borders.
     const strengths = [];
     for (let r = 0; r < rows; r++) for (let k = 0; k <= cols; k++) strengths.push(edgeStrength(maps.vr, w, X(k), Y(r) + pad, len, false));
     for (let c = 0; c < cols; c++) for (let k = 0; k <= rows; k++) strengths.push(edgeStrength(maps.hr, w, X(c) + pad, Y(k), len, true));
@@ -252,7 +252,7 @@ const Vision = (() => {
     const vLine = (k, r) => edgeFill(maps.vr, w, X(k), Y(r) + pad, len, false, minC) >= EDGE_FILL;
     const hLine = (c, k) => edgeFill(maps.hr, w, X(c) + pad, Y(k), len, true, minC) >= EDGE_FILL;
 
-    // об'єднуємо сусідні одиниці без лінії між ними
+    // merge neighbouring cells with no line between them
     const parent = Array.from({ length: cols * rows }, (_, i) => i);
     const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
     const join = (a, b) => { parent[find(a)] = find(b); };
@@ -275,9 +275,9 @@ const Vision = (() => {
       const cs = cells.map(i => i % cols), rs = cells.map(i => Math.floor(i / cols));
       const c = Math.min(...cs), r = Math.min(...rs);
       const iw = Math.max(...cs) - c + 1, ih = Math.max(...rs) - r + 1;
-      if (cells.length !== iw * ih) continue;            // не прямокутник: помилка, пропускаємо
-      if (iw > 4 || ih > 4) continue;                    // таких великих вантажів не буває
-      // усі зовнішні межі мають бути лініями, інакше предмет обрізаний прокруткою
+      if (cells.length !== iw * ih) continue;            // not a rectangle: an error, skip
+      if (iw > 4 || ih > 4) continue;                    // cargo this large does not exist
+      // all outer edges must be lines, otherwise the item is cut off by scrolling
       let closed = true;
       for (let k = 0; k < iw && closed; k++) closed = hLine(c + k, r) && hLine(c + k, r + ih);
       for (let k = 0; k < ih && closed; k++) closed = vLine(c, r + k) && vLine(c + iw, r + k);
@@ -287,9 +287,9 @@ const Vision = (() => {
     return items;
   }
 
-  // Сітка і вантажі при відомому розмірі клітинки. Якщо розмір вийшов удвічі меншим за справжній,
-  // межі вантажів усе одно знаходяться, але кожен вантаж має парні розміри на парних позиціях:
-  // тоді подвоюємо клітинку й розбираємо ще раз. Повертає { P, grid, items } або null.
+  // Grid and cargo for a known cell size. If the size came out half the real one,
+  // cargo borders are still found, but every cargo has even sizes at even positions:
+  // then the cell is doubled and the frame is parsed again. Returns { P, grid, items } or null.
   function analyze(G, maps, P) {
     for (let attempt = 0; attempt < 3; attempt++) {
       const grid = locate(gridProfiles(G.w, G.h, maps, P), P);
@@ -307,25 +307,25 @@ const Vision = (() => {
     return even.length >= items.length * 0.85;
   }
 
-  // Смуга прокрутки праворуч від сітки: тьмяна доріжка на всю висоту списку і світлий повзунок.
-  // Повертає { x, trackTop, trackLen, thumbTop, thumbLen } у пікселях кадру або null.
-  // known — доріжка, знайдена раніше: тоді шукаємо лише повзунок на ній.
+  // Scrollbar to the right of the grid: a dim track the full height of the list and a light thumb.
+  // Returns { x, trackTop, trackLen, thumbTop, thumbLen } in frame pixels or null.
+  // known — a track found earlier: then only the thumb on it is searched.
   function scrollbar({ w, h, g }, grid, known) {
     if (known) return thumbOn({ w, h, g }, known);
     const right = Math.round(grid.x0 + grid.cols * grid.P);
     let best = null;
     for (let x = right + 2; x < Math.min(w - 4, right + grid.P * 0.5); x++) {
-      // наскільки стовпчик світліший за фон праворуч від нього
+      // how much brighter the column is than the background to its right
       const diff = y => g[y * w + x] - g[y * w + x + 4];
       const track = longestRun(h, y => diff(y) > 10);
       if (!track || track.len < grid.P * 2) continue;
-      // повзунок — помітно світліший за саму доріжку (рівень доріжки — медіана стовпчика)
+      // the thumb is noticeably brighter than the track itself (track level — the column median)
       const vals = [];
       for (let y = track.start; y < track.start + track.len; y++) vals.push(g[y * w + x]);
       vals.sort((a, b) => a - b);
       const med = vals[vals.length >> 1], top = vals[vals.length - 1];
       if (top - med < 20) {
-        // повзунок на всю доріжку: список уміщається без прокрутки
+        // thumb over the whole track: the list fits without scrolling
         if (!best) best = { x, trackTop: track.start, trackLen: track.len, thumbTop: track.start, thumbLen: track.len };
         continue;
       }
@@ -337,9 +337,9 @@ const Vision = (() => {
     return best;
   }
 
-  // Повзунок на відомій доріжці: найсвітліший відрізок стовпчика в її межах (±1 px по x)
+  // Thumb on a known track: the brightest stretch of the column within it (±1 px in x)
   function thumbOn({ w, h, g }, k) {
-    if (k.thumbLen >= k.trackLen - 2) return k; // список без прокрутки
+    if (k.thumbLen >= k.trackLen - 2) return k; // list without scrolling
     let best = null;
     for (let x = k.x - 1; x <= k.x + 1; x++) {
       if (x < 0 || x >= w) continue;
@@ -357,7 +357,7 @@ const Vision = (() => {
     return best;
   }
 
-  // Найдовший відрізок, де pred(y) істинний (з пропусками до 2 px)
+  // The longest stretch where pred(y) is true (with gaps up to 2 px)
   function longestRun(h, pred) {
     let best = null, start = -1, gap = 0;
     for (let y = 0; y <= h; y++) {
@@ -372,7 +372,7 @@ const Vision = (() => {
     return best;
   }
 
-  // Середній колір прямокутника (RGBA-дані кадру), для вантажів, розкритих розвідданими
+  // Mean color of a rectangle (RGBA frame data), for cargo revealed by intel
   function meanColor(data, w, x, y, rw, rh) {
     let r = 0, gg = 0, b = 0, n = 0;
     const step = Math.max(1, Math.round(Math.min(rw, rh) / 16));
@@ -385,9 +385,9 @@ const Vision = (() => {
     return n ? [r / n, gg / n, b / n] : [0, 0, 0];
   }
 
-  // Частка «непорожніх» пікселів усередині прямокутника (текст, іконка)
+  // Share of "non-empty" pixels inside a rectangle (text, icon)
   function occupancy({ w, g }, x, y, rw, rh) {
-    const inset = 4; // лише рамка; назва предмета притиснута до верхнього краю
+    const inset = 4; // border only; the item name sits at the top edge
     let n = 0, hit = 0;
     for (let yy = y + inset; yy < y + rh - inset; yy++) {
       for (let xx = x + inset; xx < x + rw - inset; xx++) { n++; if (g[yy * w + xx] > OCC_T) hit++; }
@@ -395,7 +395,7 @@ const Vision = (() => {
     return n ? hit / n : 0;
   }
 
-  // Вертикальний зсув вмісту між двома маленькими кадрами: cur(y) ≈ prev(y + d)
+  // Vertical content shift between two small frames: cur(y) ≈ prev(y + d)
   function estimateShift(prev, cur, w, h, maxS) {
     let best = 0, bestCost = Infinity;
     for (let d = -maxS; d <= maxS; d++) {
@@ -412,7 +412,7 @@ const Vision = (() => {
     return { d: best, cost: bestCost };
   }
 
-  // Середня різниця двох однакових за розміром фрагментів
+  // Mean difference of two equally sized patches
   function patchDiff(a, b) {
     let s = 0;
     for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);

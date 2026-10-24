@@ -17,7 +17,7 @@
   header .status { color: var(--muted); }
   main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 0 20px 16px; }
   @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
-  /* зверху: результат зліва (лишається на місці при гортанні), схема справа у своєму вікні */
+  /* top: result on the left (stays in place when scrolling), map on the right in its own box */
   .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px 20px 0; align-items: start; }
   .top .result-col { position: sticky; top: 8px; }
   .map-wrap { max-height: calc(100vh - 150px); overflow: auto; }
@@ -41,7 +41,7 @@
   input[type=range] { width: 140px; }
   #log { max-height: 180px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-  /* Кроки */
+  /* Steps */
   .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .step { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; color: var(--muted); font-size: 13px; }
   .step b { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; background: #2a2f38; margin-right: 6px; }
@@ -52,7 +52,7 @@
   .stage .title { font-size: 18px; font-weight: 700; color: var(--accent); }
   .stage .grow { flex: 1; }
 
-  /* Результат */
+  /* Result */
   #result { border-radius: 8px; padding: 16px; background: #0b0c0f; border: 1px solid var(--line); min-height: 150px; transition: border-color .15s, background .15s; }
   #result .big { font-size: 40px; font-weight: 800; line-height: 1.1; }
   .chance { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid; border-radius: 8px; margin: 12px 0; }
@@ -63,16 +63,7 @@
   .tile .noimg { height: 72px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
   .tile i { display: block; height: 3px; border-radius: 2px; margin: 6px 10px; }
   .tile b { font-size: 15px; font-variant-numeric: tabular-nums; }
-  #result[data-kind=sound] .tile { cursor: pointer; }
-  #result[data-kind=sound] .tile:hover { border-color: var(--accent); }
-  #result .mine { font-size: 12px; margin-top: 10px; }
 
-  /* Покупки */
-  .buy { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #ffffff0a; font-size: 13px; }
-  .buy img { width: 32px; height: 32px; object-fit: contain; background: #0b0c0f; border-radius: 4px; flex: none; }
-  .buy .grow { flex: 1; min-width: 0; }
-  .buy .grow div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .buy .meta { color: var(--muted); font-size: 12px; }
   .lang { margin-left: auto; }
   .update { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #3b82f6; color: #93c5fd; text-decoration: none; font-size: 13px; }
   .update:hover { background: rgba(59, 130, 246, .15); }
@@ -93,7 +84,7 @@
   .chip img { width: 28px; height: 28px; object-fit: contain; }
   .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 
-  /* Звуки */
+  /* Sounds */
   .sound { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
   .sound.recording { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
   .sound.hit { border-color: var(--accent); }
@@ -118,9 +109,9 @@
 <body>
 <header>
   <h1 data-i18n="app">ABI Kaluvan</h1>
-  <button id="btnStart" class="primary" data-i18n="btn.start">Почати ловлю</button>
-  <button id="btnStop" disabled data-i18n="btn.stop">Зупинити</button>
-  <span class="status" id="status" data-i18n="status.idle">Не запущено</span>
+  <button id="btnStart" class="primary" data-i18n="btn.start">Start catching</button>
+  <button id="btnStop" disabled data-i18n="btn.stop">Stop</button>
+  <span class="status" id="status" data-i18n="status.idle">Not running</span>
   <a id="update" class="update" target="_blank" rel="noopener" hidden></a>
   <select id="lang" class="lang" title="Мова · Language · Язык">
     <option value="uk">UA</option><option value="en">ENG</option><option value="ru">RU</option>
@@ -129,16 +120,16 @@
 
 <div class="top">
   <section class="result-col">
-    <h2 data-i18n="h.result">Результат</h2>
-    <div id="result"><span class="muted" data-i18n="result.wait">Чекаю на звук…</span></div>
+    <h2 data-i18n="h.result">Result</h2>
+    <div id="result"><span class="muted" data-i18n="result.wait">Waiting for a sound…</span></div>
   </section>
 
   <section class="map-col">
     <div class="stage">
       <span class="title" id="stageTitle"></span>
       <span class="grow muted" id="stageHint"></span>
-      <button id="btnDone" class="primary" hidden data-i18n="btn.done">Готово</button>
-      <button id="btnRescan" hidden data-i18n="btn.rescan">Шукати заново</button>
+      <button id="btnDone" class="primary" hidden data-i18n="btn.done">Done</button>
+      <button id="btnRescan" hidden data-i18n="btn.rescan">Scan again</button>
     </div>
     <div class="map-wrap"><canvas id="map" width="360" height="200"></canvas></div>
     <p class="muted" style="margin:8px 0 0" data-i18n="map.hint"></p>
@@ -150,58 +141,48 @@
   <div>
 
     <section>
-      <h2 data-i18n="h.level">Рівень звуку</h2>
+      <h2 data-i18n="h.level">Sound level</h2>
       <canvas id="spec" width="800" height="160"></canvas>
       <div class="row" style="margin-top:10px">
-        <label><span data-i18n="lbl.sens">Чутливість</span> <input type="range" id="sens" min="4" max="30" value="12"></label>
+        <label><span data-i18n="lbl.sens">Sensitivity</span> <input type="range" id="sens" min="4" max="30" value="12"></label>
         <span id="sensVal" class="muted"></span>
-        <label><span data-i18n="lbl.thr">Поріг збігу</span> <input type="range" id="thr" min="30" max="95" value="50"></label>
+        <label><span data-i18n="lbl.thr">Match threshold</span> <input type="range" id="thr" min="30" max="95" value="50"></label>
         <span id="thrVal" class="muted"></span>
-        <label><input type="checkbox" id="beep" checked> <span data-i18n="lbl.beep">Сигнал</span></label>
+        <label><input type="checkbox" id="beep" checked> <span data-i18n="lbl.beep">Beep</span></label>
       </div>
     </section>
 
     <section>
-      <h2 data-i18n="h.log">Журнал</h2>
+      <h2 data-i18n="h.log">Log</h2>
       <div id="log"></div>
-    </section>
-
-    <section>
-      <h2><span data-i18n="h.buys">Покупки</span> <span id="buysSummary" class="muted" style="text-transform:none;letter-spacing:0"></span></h2>
-      <div class="row">
-        <span style="flex:1"></span>
-        <button id="btnBuysExport" data-i18n="btn.export">Експорт</button>
-        <button id="btnBuysClear" class="danger" data-i18n="buys.clear">Очистити</button>
-      </div>
-      <div id="buys"></div>
     </section>
   </div>
 
   <div>
     <section>
-      <h2 data-i18n="h.sounds">Звуки</h2>
+      <h2 data-i18n="h.sounds">Sounds</h2>
       <div class="row">
-        <button id="btnLib" class="primary" data-i18n="btn.lib">Імпорт бібліотеки</button>
+        <button id="btnLib" class="primary" data-i18n="btn.lib">Import library</button>
         <select id="profile" hidden data-i18n-title="tip.profile"></select>
-        <label data-i18n-title="tip.blue"><input type="checkbox" id="blue"> <span data-i18n="lbl.blue">Сині</span></label>
+        <label data-i18n-title="tip.blue"><input type="checkbox" id="blue"> <span data-i18n="lbl.blue">Blue</span></label>
         <input type="file" id="libDir" webkitdirectory hidden>
       </div>
       <div class="row">
         <input type="text" id="newName" data-i18n-ph="ph.newName" style="flex:1">
-        <button id="btnAdd" data-i18n="btn.add">Додати</button>
+        <button id="btnAdd" data-i18n="btn.add">Add</button>
       </div>
       <div id="sounds"></div>
       <div class="row" style="margin-top:12px">
-        <button id="btnExport" data-i18n="btn.export">Експорт</button>
-        <button id="btnImport" data-i18n="btn.import">Імпорт</button>
-        <button id="btnClear" class="danger" data-i18n="btn.clear">Очистити все</button>
+        <button id="btnExport" data-i18n="btn.export">Export</button>
+        <button id="btnImport" data-i18n="btn.import">Import</button>
+        <button id="btnClear" class="danger" data-i18n="btn.clear">Clear all</button>
         <input type="file" id="file" accept=".json" hidden>
         <input type="file" id="imgFile" accept="image/*" hidden>
       </div>
     </section>
 
     <section>
-      <h2 data-i18n="h.help">Як користуватись</h2>
+      <h2 data-i18n="h.help">How to use</h2>
       <ol class="help">
         <li data-i18n-html="help.1"></li>
         <li data-i18n-html="help.2"></li>
@@ -229,31 +210,31 @@
 <script>
 'use strict';
 
-// ---------- Константи ----------
-const TRACK_SX = 4, TRACK_SY = 2;  // зменшення кадру для стеження за прокруткою
-const RING_MS = 3000;        // скільки історії кадрів тримати
-const OCC_GREY = 0.3;        // частка «сірого» в комірці, щоб вважати її вантажем (порожні слоти чорні)
-const PICK_MIN_DIFF = 4;     // мінімальна зміна вантажу (0–255), щоб вважати його потягнутим
-const RED_MIN = 3;           // мінімальна «червоність» сліду на місці потягнутого вантажу
-const MAP_U = 56;            // розмір одиниці на схемі
-const SCAN_MS = 150;         // як часто розбирати сітку, коли схема готова (рамку з ціною помічаємо швидше)
-const SCAN_FAST_MS = 45;     // і під час скану: кожен вантаж має встигнути набрати голоси, поки його видно
-const QUIET_MS = 1500;       // стільки після звуку картинка вважається «брудною» (вантаж тягнуть)
-const REOPEN_MS = 5000;      // під час скану сітки не видно довше — торговця закрили, скан наново
-const FREEZE_STABLE = 3;     // стільки розборів без нових вантажів — і схема готова
-const REVEAL_STREAK = 4;     // колір розвідданих має триматися стільки розборів
-const MERCHANT_FRESH_MS = 1500; // сітку торговця бачили так недавно — значить, він відкритий
-const NO_BAR_LIMIT = 8;      // стільки розборів без смуги прокрутки — список короткий, рахуємо без неї
-const THUMB_TOLERANCE = 0.12; // повзунок довший/коротший за запамʼятований більше ніж на стільки — підозріло
-const THUMB_NEW_STREAK = 8;  // стільки розборів поспіль нова довжина — значить, список справді змінився
-const MAP_MAX_ROWS = 80;     // більше рядків у торговця не буває; більше на схемі — помилка
-const MIN_VOTES = 2;         // стільки кадрів має підтвердити вантаж, щоб він зʼявився на схемі
-const SPLIT_SHARE = 0.35;    // менші вантажі перемагають великий, якщо кожного бачили хоч у стільки разів рідше
-const UP_BIAS = 0.03;        // «поклав» перемагає «взяв» лише з таким запасом
-const TAP_BLOCK = 512;       // скільки відліків звуку передавати з аудіопотоку за раз
+// ---------- Constants ----------
+const TRACK_SX = 4, TRACK_SY = 2;  // frame downscale for scroll tracking
+const RING_MS = 3000;        // how much frame history to keep
+const OCC_GREY = 0.3;        // share of "grey" in a cell to count it as cargo (empty slots are black)
+const PICK_MIN_DIFF = 4;     // minimal cargo change (0–255) to count it as dragged
+const RED_MIN = 3;           // minimal "redness" of the trace where a cargo was dragged
+const MAP_U = 56;            // map unit size
+const SCAN_MS = 150;         // how often to parse the grid once the map is ready (price tooltips are noticed sooner)
+const SCAN_FAST_MS = 45;     // and during the scan: every cargo must collect its votes while visible
+const QUIET_MS = 1500;       // for this long after a sound the picture is "dirty" (a cargo is being dragged)
+const REOPEN_MS = 5000;      // grid not seen for longer during a scan: the merchant was closed, scan again
+const FREEZE_STABLE = 3;     // this many parses without new cargo, and the map is ready
+const REVEAL_STREAK = 4;     // a revealed color has to hold for this many parses
+const MERCHANT_FRESH_MS = 1500; // the merchant grid was seen this recently, so it is open
+const NO_BAR_LIMIT = 8;      // this many parses without a scrollbar: the list is short, count without it
+const THUMB_TOLERANCE = 0.12; // a thumb longer/shorter than remembered by more than this is suspicious
+const THUMB_NEW_STREAK = 8;  // a new length for this many parses in a row: the list really changed
+const MAP_MAX_ROWS = 80;     // the merchant never has more rows; more on the map is an error
+const MIN_VOTES = 2;         // this many frames must confirm a cargo before it appears on the map
+const SPLIT_SHARE = 0.35;    // smaller cargo beat a big one if each was seen at least this often relative to it
+const UP_BIAS = 0.03;        // "put down" beats "pick up" only by this margin
+const TAP_BLOCK = 512;       // how many audio samples to pass from the audio stream at once
 
 const QUALITIES = [
-  // назви — qName() поточною мовою
+  // names: qName() in the current language
   { id: 'red', color: '#ef4444' },
   { id: 'gold', color: '#f0b429' },
   { id: 'purple', color: '#a855f7' },
@@ -263,42 +244,41 @@ const QUALITIES = [
 ];
 const qById = Object.fromEntries(QUALITIES.map(q => [q.id, q]));
 const SIZES = ['1x1', '1x2', '2x1', '2x2', '2x3', '3x2'];
-const SIZE_KEYS = ['1x1', '1x2', '2x2', '1x3', '2x3', '3x3']; // розміри без повороту, для показу
+const SIZE_KEYS = ['1x1', '1x2', '2x2', '1x3', '2x3', '3x3']; // sizes without rotation, for display
 const MYSTERY_TIERS = {
   rare: { short: 'Rare', tiny: 'Rare', name: 'Rare Mystery Cargo', color: '#a855f7' },
   uncommon: { short: 'Uncommon', tiny: 'Unc', name: 'Uncommon Mystery Cargo', color: '#3b82f6' },
   common: { short: 'Mystery', tiny: 'Myst', name: 'Mystery Cargo', color: '#d1d5db' },
 };
-const LABEL_TRIES = 4;       // стільки спроб прочитати напис вантажу
-const PRICE_MARKUP = 1.1;    // торговець накидає ~10% до ціни пулу (100 000 у таблиці — 110 000 у грі)
-const PRICE_MATCH_LOG = 0.25; // ціна з рамки має бути близько до ціни пулу (у логарифмі, ≈ ±28%)
-const HOVER_DIFF = 12;       // вантаж змінився сильніше — його накрила рамка з ціною
-const HOVER_KEEP_MS = 6000;  // стільки після наведення звук «взяв» належить наведеному вантажу
-const HOVER_MAX_CARGO = 16;  // рамка закриває не більше стількох вантажів; більше — це вже не рамка
-const TIP_W = 3.2, TIP_H = 1.8; // розмір рамки з ціною в клітинках (із запасом)
-const BASE_UPDATE_MAX = 6;   // еталон вигляду оновлюємо лише на дрібні зміни (не на рамку з ціною)
-const STORE_KEY = 'abi-ear-sounds-v4';       // v4: свої записи — сирий звук, а не відбиток
+const LABEL_TRIES = 4;       // attempts to read a cargo label
+const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
+const PRICE_MATCH_LOG = 0.25; // the tooltip price must be close to the pool price (in log scale, ≈ ±28%)
+const HOVER_DIFF = 12;       // a cargo changed more than this: the price tooltip covered it
+const HOVER_KEEP_MS = 6000;  // for this long after hovering, a "pick up" sound belongs to the hovered cargo
+const HOVER_MAX_CARGO = 16;  // a tooltip covers at most this many cargo; more is not a tooltip
+const TIP_W = 3.2, TIP_H = 1.8; // price tooltip size in cells (with a margin)
+const BASE_UPDATE_MAX = 6;   // the appearance reference is updated only on small changes (not on a tooltip)
+const STORE_KEY = 'abi-ear-sounds-v4';       // v4: own recordings are raw sound, not a fingerprint
 const OLD_STORE_KEYS = ['abi-ear-sounds-v3', 'abi-ear-sounds-v2'];
-const OLD_REGION_KEY = 'abi-ear-region-v1'; // ручна рамка зі старих версій — більше не потрібна
-const MERCHANT_SIDE = 0.5;   // сітку торговця шукаємо правіше від цієї частки ширини вікна гри
-const REDETECT_AFTER = 8;    // раз на стільки кадрів (поки схема не готова) перевіряємо розмір клітинки
-const REDETECT_MAX_CARGO = 6; // стільки вантажів уже знайдено — розмір клітинки точно правильний
+const OLD_REGION_KEY = 'abi-ear-region-v1'; // manual frame from old versions, no longer needed
+const MERCHANT_SIDE = 0.5;   // the merchant grid is searched to the right of this share of the game window width
+const REDETECT_AFTER = 8;    // once per this many frames (until the map is ready) the cell size is re-checked
+const REDETECT_MAX_CARGO = 6; // this many cargo found: the cell size is certainly right
 const PROFILES_KEY = 'abi-ear-profiles-v1';
 const PROFILE_KEY = 'abi-ear-profile-v1';
 const BLUE_KEY = 'abi-ear-blue-v1';
-const PURCHASES_KEY = 'abi-kaluvan-purchases-v2'; // v1 — записи з ніком-помилкою, не беремо
+const PURCHASES_KEY = 'abi-kaluvan-purchases-v2'; // v1 had records from the nickname bug, not used
 const OLD_PURCHASE_KEYS = ['abi-kaluvan-purchases-v1', 'abi-kaluvan-nick-v1'];
-const PRIOR_N = 20;          // дані торговця важать як стільки своїх покупок (більше — повільніше вчиться)
-const FEED_MS = 1000;        // як часто дивитись на рядок «… obtained [предмет]» над сіткою
-const FEED_TOP = 1.15, FEED_BOTTOM = 0.6; // де він: смуга над верхом списку, у клітинках
-const BUY_MATCH = 0.01;      // сума з рядка й ціна з рамки збігаються з такою точністю
-const BUY_SHOWN = 30;        // стільки останніх покупок показувати в списку
-const BALANCE_LEFT = 0.4;    // баланс «Owned» — правіше від такої частки ширини списку
-const BALANCE_BELOW = 2.6;   // і не нижче стількох клітинок під списком
-const FEED_WAIT_MS = 30000;  // рядок стрічки чекає підтвердження балансом стільки
-const FEED_SAME_MS = 60000;  // той самий рядок (ціна й схожа назва) у цих межах — та сама покупка
-const BASE_URL = 'library/purchases.json'; // спільна база в папці програми
-const BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'; // і найсвіжіша на GitHub
+const PRIOR_N = 20;          // the merchant data weighs as much as this many own purchases (more: learns slower)
+const FEED_MS = 1000;        // how often to look at the "… obtained [item]" line above the grid
+const FEED_TOP = 1.15, FEED_BOTTOM = 0.6; // where it is: a band above the top of the list, in cells
+const BUY_MATCH = 0.01;      // the line amount and the tooltip price match with this precision
+const BALANCE_LEFT = 0.4;    // the "Owned" balance is right of this share of the list width
+const BALANCE_BELOW = 2.6;   // and no lower than this many cells below the list
+const FEED_WAIT_MS = 30000;  // a feed line waits this long for the balance to confirm it
+const FEED_SAME_MS = 60000;  // the same line (price and similar name) within this window is the same purchase
+const BASE_URL = 'library/purchases.json'; // shared base in the app folder
+const BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'; // and the freshest one on GitHub
 
 // ---------- DOM ----------
 const $ = id => document.getElementById(id);
@@ -312,63 +292,62 @@ const ui = {
 const specCtx = ui.spec.getContext('2d');
 const mapCtx = ui.map.getContext('2d');
 
-// ---------- Стан ----------
+// ---------- State ----------
 let stream = null, audioCtx = null, workletNode = null, srcNode = null, beepCtx = null;
 let detector = null;
-let gameWs = null, gameStatus = null; // звук лише гри від локального сервера
-let screenWs = null;         // кадри екрана від локального сервера
-const tplCache = new Map();  // id звуку → { up: [еталон], down: [еталон] }
-let captureOnset = -Infinity; // коли почався звук (performance.now)
-let recordingId = null;      // id звуку, для якого пишемо зразок
+let gameWs = null, gameStatus = null; // game-only sound from the local server
+let screenWs = null;         // screen frames from the local server
+const tplCache = new Map();  // sound id → { up: [template], down: [template] }
+let captureOnset = -Infinity; // when the sound started (performance.now)
+let recordingId = null;      // id of the sound a sample is being recorded for
 let lastHitId = null;
 let muteUntil = 0;
 let sounds = loadSounds();
-let profiles = loadJson(PROFILES_KEY, []);   // карти з бібліотеки: [{ id, name }]
-let profile = loadJson(PROFILE_KEY, '');     // вибрана карта ('' — середнє по всіх)
-let includeBlue = loadJson(BLUE_KEY, false); // чи рахувати сині предмети
-let purchases = loadJson(PURCHASES_KEY, []); // свої покупки: [{ t, soundId, size, label, price, itemId, item, q }]
-let basePurchases = [];      // спільна база, що йде з програмою (library/purchases.json) і оновлюється з GitHub
-let balance = null, spent = 0;               // баланс Koen під сіткою і на скільки він зменшився (ще не пояснено покупками)
-let balanceSig = null, feedQueue = [], feedDone = []; // рядки стрічки: чекають підтвердження балансом / уже враховані
-let feedBusy = false, feedAt = 0, feedSig = null; // читання рядка стрічки й балансу
-let cardCtx = null;          // що показує картка результату: { soundId, size, label, key } — для запису покупки
-let libPools = [], itemQ = {}, itemById = new Map(); // пули торговця й предмети з бібліотеки
-let hover = null;            // вантаж, на який щойно навели: { key, t }
-let hoverBusy = false, hoverSig = ''; // читання рамки з ціною: зайнято / які вантажі вона закриває
+let profiles = loadJson(PROFILES_KEY, []);   // maps from the library: [{ id, name }]
+let profile = loadJson(PROFILE_KEY, '');     // selected map ('' — average over all)
+let includeBlue = loadJson(BLUE_KEY, false); // whether to count blue items
+let purchases = loadJson(PURCHASES_KEY, []); // own purchases: [{ t, soundId, size, label, price, itemId, item, q }]
+let basePurchases = [];      // shared base shipped with the app (library/purchases.json) and refreshed from GitHub
+let balance = null, spent = 0;               // Koen balance below the grid and how much it dropped (not yet explained by purchases)
+let balanceSig = null, feedQueue = [], feedDone = []; // feed lines: waiting for balance confirmation / already counted
+let feedBusy = false, feedAt = 0, feedSig = null; // reading of the feed line and the balance
+let libPools = [], itemQ = {}, itemById = new Map(); // merchant pools and items from the library
+let hover = null;            // the cargo just hovered: { key, t }
+let hoverBusy = false, hoverSig = ''; // price tooltip reading: busy / which cargo it covers
 
-// Сітка торговця. Координати «регіону» — пікселі кадру відносно лівого верхнього кута регіону.
-// Абсолютний рядок R має верхню лінію на y = R*P - offset (offset росте, коли гортаєш вниз).
-let P = 0;                   // розмір одиниці сітки, px кадру
-let checkFrames = 0;         // кадрів від останньої перевірки розміру клітинки
-let phaseX = 0;              // зсув ліній по x (0..P)
-let offset = 0;              // прокрутка
-let viewport = null;         // видима частина сітки { x, y, w, h } у px регіону
-let prevSig = null;          // підписи рядків попереднього маленького кадру
+// Merchant grid. "Region" coordinates are frame pixels relative to the region's top-left corner.
+// Absolute row R has its top line at y = R*P - offset (offset grows when scrolling down).
+let P = 0;                   // grid cell size, frame px
+let checkFrames = 0;         // frames since the last cell size check
+let phaseX = 0;              // line shift along x (0..P)
+let offset = 0;              // scroll
+let viewport = null;         // visible part of the grid { x, y, w, h } in region px
+let prevSig = null;          // row signatures of the previous small frame
 let ring = [];               // [{ t, small, red, offset }]
-let cargo = new Map();       // ключ "C,R,w,h" → { C, R, w, h, votes, base, baseRed, thumb }
-let results = new Map();     // ключ вантажу → { soundId, score }
-let lastKey = null;          // вантаж, якому щойно призначили звук
+let cargo = new Map();       // key "C,R,w,h" → { C, R, w, h, votes, base, baseRed, thumb }
+let results = new Map();     // cargo key → { soundId, score }
+let lastKey = null;          // the cargo a sound was just assigned to
 let lastResult = null;
-let lastSeen = null;         // останнє розпізнавання для превʼю: { grid, items }
-let gridSeenAt = 0;          // коли востаннє бачили сітку торговця
-let listTopR = null;         // абсолютний рядок першого рядка списку (верх при першому виявленні)
-let phase = 'scan';          // 'scan' — збираємо схему, 'frozen' — схема готова й не змінюється
-let frozenPlaced = null;     // готова схема: зафіксований список вантажів
-let sawTop = false, sawEnd = false; // чи бачили під час скану верх і низ списку
-let stableCount = 0;         // скільки розборів поспіль не зʼявлялось нових вантажів
-let sbKnown = null;          // знайдена доріжка смуги прокрутки { x, trackTop, trackLen }
-let noBarCount = 0;          // скільки розборів сітку видно, а смуги прокрутки нема
-let thumbOddLen = 0, thumbOddCount = 0; // повзунок іншої довжини: яка і скільки кадрів поспіль
+let lastSeen = null;         // the latest recognition for the preview: { grid, items }
+let gridSeenAt = 0;          // when the merchant grid was last seen
+let listTopR = null;         // absolute row of the first list row (the top at first detection)
+let phase = 'scan';          // 'scan' — building the map, 'frozen' — the map is ready and does not change
+let frozenPlaced = null;     // the ready map: the fixed list of cargo
+let sawTop = false, sawEnd = false; // whether the top and the bottom of the list were seen during the scan
+let stableCount = 0;         // how many parses in a row had no new cargo
+let sbKnown = null;          // the scrollbar track found { x, trackTop, trackLen }
+let noBarCount = 0;          // how many parses the grid is visible but the scrollbar is not
+let thumbOddLen = 0, thumbOddCount = 0; // a thumb of a different length: which and for how many frames in a row
 let videoReader = null, videoTimer = null;
 let lastScan = 0;
-let imgTarget = null;        // { sound, index } предмет, якому вибираємо картинку
+let imgTarget = null;        // { sound, index } the item a picture is being chosen for
 
 const fullCanvas = document.createElement('canvas');
 const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
 const smallCanvas = document.createElement('canvas');
 const smallCtx = smallCanvas.getContext('2d', { willReadFrequently: true });
 
-// ---------- Захоплення ----------
+// ---------- Capture ----------
 const WORKLET_SRC = `
 class Tap extends AudioWorkletProcessor {
   constructor() { super(); this.buf = new Float32Array(${TAP_BLOCK}); this.n = 0; }
@@ -386,14 +365,14 @@ class Tap extends AudioWorkletProcessor {
 registerProcessor('tap', Tap);`;
 
 async function start() {
-  beepCtx = beepCtx || new AudioContext(); // створюємо під час кліку, щоб браузер не блокував звук
-  if (typeof Ocr !== 'undefined') Ocr.start().catch(() => {}); // розпізнавачі тексту — заздалегідь, у фоні
-  // Звук лише гри і знімок екрана дає локальний сервер (start.bat), без шарингу в браузері.
-  // Без нього — шаринг екрана браузером і весь звук ПК.
+  beepCtx = beepCtx || new AudioContext(); // created during the click so the browser does not block the sound
+  if (typeof Ocr !== 'undefined') Ocr.start().catch(() => {}); // text readers start in advance, in the background
+  // The local server (start.bat) provides the game-only sound and the screen capture, no browser sharing.
+  // Without it: browser screen sharing and all PC sound.
   gameWs = await connectGameAudio();
   screenWs = gameWs ? await connectScreen() : null;
   if (screenWs) {
-    stream = { getTracks: () => [] }; // екран іде від сервера, браузерного потоку нема
+    stream = { getTracks: () => [] }; // the screen comes from the server, there is no browser stream
     startNativeScreen();
   } else {
     try {
@@ -438,7 +417,7 @@ async function start() {
     gameWs.onclose = () => { if (stream) { gameWs = null; setStatus(tr('status.audioClosed')); } };
     showGameStatus(gameStatus);
   } else {
-    // та сама частота, що й у бібліотеки, щоб сэмпли збігались точно
+    // the same rate as the library, so the samples match exactly
     audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: Ear.SAMPLE_RATE });
     const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
     await audioCtx.audioWorklet.addModule(url);
@@ -455,7 +434,7 @@ async function start() {
   resetScan();
 }
 
-// Підʼєднання до звуку гри від локального сервера. Повертає WebSocket або null, якщо сервера нема.
+// Connects to the game sound from the local server. Returns a WebSocket or null if there is no server.
 function connectGameAudio() {
   if (!/^https?:$/.test(location.protocol)) return Promise.resolve(null);
   return new Promise(resolve => {
@@ -482,7 +461,7 @@ function closeGameAudio() {
   ws.close();
 }
 
-// Кадри екрана від сервера (JPEG). Повертає WebSocket або null.
+// Screen frames from the server (JPEG). Returns a WebSocket or null.
 function connectScreen() {
   return new Promise(resolve => {
     let ws;
@@ -495,7 +474,7 @@ function connectScreen() {
 }
 
 function startNativeScreen() {
-  let busy = false; // поки попередній кадр розбирається, нові пропускаємо: так не накопичується затримка
+  let busy = false; // new frames are skipped while the previous one is parsed, so no delay builds up
   screenWs.onmessage = e => {
     if (typeof e.data === 'string') {
       const m = JSON.parse(e.data);
@@ -551,8 +530,8 @@ function stop() {
   updateStage();
 }
 
-// ---------- Розпізнавання ----------
-// Еталони живуть лише в памʼяті: бібліотечні будуються з wav при старті, свої — із записаних хвиль
+// ---------- Recognition ----------
+// Templates live only in memory: library ones are built from wav at start, own ones from recorded waves
 function templatesOf(s) {
   let t = tplCache.get(s.id);
   if (!t) {
@@ -573,7 +552,7 @@ function allTemplates() {
 }
 
 function onWindow(win, msAgo) {
-  if (recordingId) return; // запис іде через onRaw
+  if (recordingId) return; // recording goes through onRaw
   classify(win, performance.now() - msAgo);
 }
 
@@ -594,7 +573,7 @@ function classify(win, onset) {
   const tpls = allTemplates();
   if (!tpls.some(t => t.kind === 'up')) { log(tr('log.noSounds')); return; }
   const res = Ear.match(win, tpls);
-  // найкращий «взяв» кожного звуку, за спаданням
+  // the best "pick up" of every sound, best first
   const ranked = [], seenIds = new Set();
   for (const r of res) {
     if (r.kind !== 'up' || seenIds.has(r.id)) continue;
@@ -604,7 +583,7 @@ function classify(win, onset) {
   const { s: best, score } = ranked[0];
   const thr = +ui.thr.value / 100;
 
-  // звук «поклав» (вантаж відпустили) — не новий вантаж
+  // a "put down" sound (the cargo was released) is not a new cargo
   const down = res.find(r => r.kind === 'down');
   if (down && down.score >= thr && down.score > score + UP_BIAS) {
     log(tr('log.down', { name: soundName(soundById(down.id)), p: pct(down.score) }));
@@ -618,16 +597,16 @@ function classify(win, onset) {
     log(tr('log.noise', { name: soundName(best), p: pct(score) }));
     return;
   }
-  // довгий звук має кілька ударів: не розпізнаємо його хвіст як новий вантаж
+  // a long sound has several hits: do not recognize its tail as a new cargo
   if (best.dur) muteUntil = Math.max(muteUntil, onset + best.dur * 1000 + 150);
 
   lastHitId = best.id;
   renderSounds();
   lastResult = { soundId: best.id, score, t: Date.now() };
-  // вантаж шукаємо лише коли торговець зараз на екрані: інакше (сховище, рейд) схема стара,
-  // і розмір чужого вантажу зіпсував би шанси
+  // a cargo is searched only while the merchant is on screen: otherwise (stash, raid) the map is stale,
+  // and the size of an unrelated cargo would spoil the odds
   const merchantOpen = cargo.size && performance.now() - gridSeenAt < MERCHANT_FRESH_MS;
-  // вантаж: той, на який щойно навели (як у платному сайті); інакше — за червоним слідом
+  // the cargo: the one just hovered (like the paid site does); otherwise by the red trace
   const hovered = hover && performance.now() - hover.t < HOVER_KEEP_MS && cargo.has(hover.key) ? hover.key : null;
   const key = merchantOpen ? hovered || pickCargo(onset) : null;
   hover = null;
@@ -650,11 +629,11 @@ function classify(win, onset) {
   drawMap();
 }
 
-// ---------- Шанси ----------
-// Вага предмета для вибраної карти; свої предмети (без даних торговця) мають одну вагу на всі карти.
-// Синіх у торговця на ділі не трапляється (хоч у таблицях abibuilder вони є) — без галочки не рахуємо.
-// label — що відомо про вантаж (cargoInfo): напис і, якщо прочитали, ціна. За ціною — лише пули цієї
-// ціни; у Mystery Cargo — лише змішані пули.
+// ---------- Odds ----------
+// Item weight for the selected map; own items (without merchant data) have one weight for all maps.
+// Blue items do not actually drop from the merchant (although the abibuilder tables have them): not counted without the checkbox.
+// label — what is known about the cargo (cargoInfo): the label and, if read, the price. By price — only pools of that
+// price; for Mystery Cargo — only mixed pools.
 function weightOf(it, label) {
   if (it.q === 'blue' && !includeBlue) return 0;
   if (label && label.priceW) return label.priceW.get(it.id) || 0;
@@ -663,17 +642,17 @@ function weightOf(it, label) {
   return it.w;
 }
 
-// Розмір без повороту: торговець може покласти вантаж повернутим (TI Module 2×1 лежить як 1×2),
-// тож порівнюємо «менша сторона × більша»
+// Size without rotation: the merchant may place a cargo rotated (TI Module 2×1 lies as 1×2),
+// so we compare "smaller side × larger side"
 function normSize(size) {
   if (!size) return '';
   const [a, b] = size.split('x').map(Number);
   return `${Math.min(a, b)}x${Math.max(a, b)}`;
 }
 
-// Предмети звуку, які підходять за розміром і написом вантажу (розмір у торговця = розмір предмета).
-// Вантаж із назвою категорії («Tools», «Military Items»…) містить лише предмети цієї категорії
-// і ніколи не буває краснухою — краснухи лише в Mystery Cargo.
+// Sound items that fit the cargo size and label (cargo size at the merchant = item size).
+// Cargo named after a category ("Tools", "Military Items"…) holds only items of that category
+// and is never red: reds only drop from Mystery Cargo.
 function itemsFor(sound, size, label) {
   let items = sound.items.filter(it => it.q !== 'blue' || includeBlue);
   if (label && label.category) {
@@ -683,20 +662,20 @@ function itemsFor(sound, size, label) {
   }
   if (!size) return items;
   const fit = items.filter(it => normSize(it.size) === normSize(size));
-  return fit.length ? fit : items; // розмір не збігся ні з ким: показуємо всіх
+  return fit.length ? fit : items; // the size matched nothing: show all
 }
 
-// Імовірність кожного предмета; якщо на карті жоден не трапляється, всі рівні.
-// Порядок: спершу краснухи, далі золоті й так донизу; усередині якості — за шансом.
+// Probability of each item; if none of them occurs on the map, all are equal.
+// Order: reds first, then golds and so on; within a quality, by chance.
 function itemOdds(sound, size, label) {
   const list = itemsFor(sound, size, label);
   let total = list.reduce((a, it) => a + weightOf(it, label), 0);
-  // за ціною не підійшов жоден предмет звуку — значить, ціну чи звук прочитано не так; без ціни
+  // no sound item fits the price, so the price or the sound was read wrong: go without the price
   if (!total && label && label.priceW) return itemOdds(sound, size, { ...label, priceW: null });
   const uniform = !total;
   if (uniform) total = list.length || 1;
-  // Свої покупки з цим звуком уточнюють шанси: дані торговця — як PRIOR_N «уявних» покупок,
-  // до яких додаються справжні (середнє апостеріорне Діріхле). Що більше покупок, то більше їм віри.
+  // Purchases with this sound refine the odds: the merchant data counts as PRIOR_N "imaginary" purchases,
+  // the real ones are added to them (Dirichlet posterior mean). The more purchases, the more they are trusted.
   const seen = boughtCounts(sound.id);
   const n = list.reduce((a, it) => a + (seen.get(it.id) || 0), 0);
   return list.map(it => {
@@ -705,14 +684,14 @@ function itemOdds(sound, size, label) {
   }).sort((a, b) => order(a.it.q) - order(b.it.q) || b.p - a.p);
 }
 
-// Скільки разів кожен предмет випадав зі звуком (спільна база + свої): id → кількість
+// How many times each item dropped with the sound (shared base + own): id → count
 function boughtCounts(soundId) {
   const out = new Map();
   for (const b of allPurchases()) if (b.soundId === soundId && b.itemId != null) out.set(b.itemId, (out.get(b.itemId) || 0) + 1);
   return out;
 }
 
-// Спільна база й свої покупки разом, без повторів (своя покупка, уже додана в базу, — одна)
+// Shared base and own purchases together, without duplicates (an own purchase already in the base counts once)
 const purchaseKey = b => `${b.t}|${b.itemId}|${b.price}`;
 function mergePurchases(...lists) {
   const out = new Map();
@@ -730,7 +709,7 @@ function qualityOdds(sound, size, label) {
   return odds;
 }
 
-// Предмет для картинки: найімовірніша краснуха, якщо є, інакше найімовірніший предмет
+// The item for the picture: the most likely red one if any, otherwise the most likely item
 function showcaseItem(sound, size, label) {
   const list = itemOdds(sound, size, label).filter(x => x.p > 0);
   const red = list.find(x => x.it.q === 'red');
@@ -749,7 +728,7 @@ function showResult(sound, score, second, size, label) {
   ui.result.style.borderColor = color;
   ui.result.style.background = color + '1a';
 
-  // шанс краснухи для кожного розміру: видно, навіть якщо вантаж не визначився
+  // red chance for every size: visible even if the cargo was not determined
   const sizes = sizesOf(sound).map(sz => {
     const r = qualityOdds(sound, sz, label).red || 0;
     return `<span class="size${sz === normSize(size) ? ' on' : ''}" style="border-color:${redColor(r)}">${sz} <b style="color:${redColor(r)}">${pct(r)}</b></span>`;
@@ -760,39 +739,34 @@ function showResult(sound, score, second, size, label) {
     : '';
 
   const parts = [tr('card.sub', { name: soundName(sound), p: pct(score) })];
-  const mine = allPurchases().filter(b => b.soundId === sound.id && b.itemId != null).length;
-  // плитки цієї картки клікабельні: «випало оце» — записати покупку вручну
-  cardCtx = { soundId: sound.id, size: normSize(size), label, key: lastResult && lastResult.soundId === sound.id ? lastResult.key : null };
-  ui.result.dataset.kind = 'sound';
   ui.result.innerHTML = `
     <div class="big" style="color:${color}">${red >= 0.995 ? tr('card.red') : red > 0 ? tr('card.redP', { p: pct(red) }) : tr('card.notRed')}</div>
     <div class="sub">${esc(parts[0] + (size ? tr('card.cargo', { size: normSize(size) }) : ''))}${label && (label.mystery || label.category) ? `, ${esc(labelName(label))}` : ''}${label && label.price ? `, ${fmtPrice(label.price)}` : ''}</div>
     ${sizes ? `<div class="sizes">${sizes}</div>` : ''}
     ${chanceRow(red)}
     ${itemTiles(itemOdds(sound, size, label))}
-    <div class="muted mine">${esc(mine ? tr('card.mine', { n: mine }) : tr('card.recordHint'))}</div>
     ${alt}`;
   document.title = tr('doc.title', { p: pct(red), app: tr('app') });
 }
 
-// Рядок «Шанс краснухи NN%»
+// The "Red chance NN%" row
 function chanceRow(red) {
   const c = redColor(red);
   return `<div class="chance" style="border-color:${c}66;background:${c}14"><span><span class="dot" style="background:${c}"></span> ${tr('pop.red')}</span><b style="color:${c}">${pct(red)}</b></div>`;
 }
 
-// Плитки можливих предметів: картинка, смужка якості, шанс. Краснухи першими, нульові не показуємо.
+// Tiles of possible items: picture, quality bar, chance. Reds first, zero ones are not shown.
 function itemTiles(list, max = 12) {
   const shown = (list.some(x => x.p > 0) ? list.filter(x => x.p >= 0.005) : list).slice(0, max);
   return `<div class="tiles">${shown.map(({ it, p }) => `
-    <div class="tile" data-id="${esc(it.id)}" title="${esc(itemName(it))} · ${normSize(it.size)}${it.price ? ' · ~' + money(it.price) : ''}">
+    <div class="tile" title="${esc(itemName(it))} · ${normSize(it.size)}${it.price ? ' · ~' + money(it.price) : ''}">
       ${it.img ? `<img src="${it.img}" alt="">` : `<div class="noimg">${esc(itemName(it))}</div>`}
       <i style="background:${qById[it.q].color}"></i>
       <b>${pctFine(p)}</b>
     </div>`).join('')}</div>`;
 }
 
-// ---------- Екран: пошук сітки, прокрутка, вантажі ----------
+// ---------- Screen: grid search, scrolling, cargo ----------
 function resetScan() {
   P = 0; checkFrames = 0; offset = 0; viewport = null; prevSig = null; ring = []; listTopR = null;
   cargo = new Map(); results = new Map(); lastKey = null; lastSeen = null; gridSeenAt = 0;
@@ -804,7 +778,7 @@ function resetScan() {
 
 function startVideo(track) {
   if ('MediaStreamTrackProcessor' in window) {
-    // працює навіть коли вкладка у фоні, на відміну від <video> + таймерів
+    // works even when the tab is in the background, unlike <video> + timers
     videoReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
     const reader = videoReader;
     (async () => {
@@ -822,9 +796,9 @@ function startVideo(track) {
   }
 }
 
-// Сітку торговця шукаємо в правій половині вікна гри: торговець завжди справа, а зліва — власні
-// кишені й рюкзак гравця з такими самими клітинками
-let frameCropped = false; // сервер уже шле лише праву частину вікна (див. helper.cs)
+// The merchant grid is searched in the right half of the game window: the merchant is always on the right, and on the
+// left are the player's own pockets and backpack with the same kind of cells
+let frameCropped = false; // the server already sends only the right part of the window (see helper.cs)
 function regionPx(w, h) {
   if (frameCropped) return { x: 0, y: 0, w, h };
   return { x: Math.round(w * MERCHANT_SIDE), y: 0, w: w - Math.round(w * MERCHANT_SIDE), h };
@@ -837,7 +811,7 @@ function onVideoFrame(src, fw, fh) {
   if (now - lastScan >= (phase === 'scan' ? SCAN_FAST_MS : SCAN_MS)) { lastScan = now; analyze(src, rp); }
 }
 
-// Маленький кадр видимої частини сітки: для стеження за прокруткою і для пошуку потягнутого вантажу
+// A small frame of the visible part of the grid: for scroll tracking and for finding a dragged cargo
 function track(src, rp, now) {
   const sw = Math.max(8, Math.round(viewport.w / TRACK_SX)), sh = Math.max(8, Math.round(viewport.h / TRACK_SY));
   if (smallCanvas.width !== sw || smallCanvas.height !== sh) { smallCanvas.width = sw; smallCanvas.height = sh; prevSig = null; ring = []; }
@@ -855,7 +829,7 @@ function track(src, rp, now) {
   while (ring.length && ring[0].t < now - RING_MS) ring.shift();
 }
 
-// Кожен рядок маленького кадру стискаємо до ROW_BINS середніх: так шукати зсув у рази швидше
+// Every row of the small frame is squeezed to ROW_BINS means: the shift search gets many times faster
 const ROW_BINS = 16;
 function rowSignature(g, w, h) {
   const out = new Uint8Array(ROW_BINS * h);
@@ -875,8 +849,8 @@ function analyze(src, rp) {
   fullCtx.drawImage(src, rp.x, rp.y, rp.w, rp.h, 0, 0, rp.w, rp.h);
   const rgba = fullCtx.getImageData(0, 0, rp.w, rp.h).data;
   const G = Vision.toGray(rgba, rp.w, rp.h);
-  // Лінії шукаємо лише довкола вже знайденого списку (з запасом на смугу прокрутки й написи) —
-  // це найдовша частина розбору. Не знайшли там сітки — шукаємо по всій правій половині.
+  // Lines are searched only around the list already found (with a margin for the scrollbar and labels):
+  // this is the longest part of the parse. If no grid is found there, the whole right half is searched.
   const roi = viewport && P ? { x0: viewport.x - P, y0: viewport.y - P * 1.5, x1: viewport.x + viewport.w + P * 1.5, y1: viewport.y + viewport.h + P } : null;
   let maps = Vision.lineMaps(G, roi);
   if (!P) {
@@ -886,10 +860,10 @@ function analyze(src, rp) {
   const now = performance.now();
   let found = Vision.analyze(G, maps, P);
   if (!found && roi) { maps = Vision.lineMaps(G); found = Vision.analyze(G, maps, P); }
-  // Розмір клітинки могли взяти з кадру без торговця (інвентар, рейд), якщо ловлю почали раніше:
-  // з ним справжню сітку не знайти, а випадкові «вантажі» трапляються. Поки схема не готова (чи сітки
-  // нема), час від часу перевіряємо розмір наново і беремо той, з яким вантажі займають більшу площу.
-  // Коли вантажів уже чимало, сітка справжня — не перевіряємо.
+  // The cell size may have been taken from a frame without the merchant (inventory, raid) if catching started earlier:
+  // with it the real grid is never found, while random "cargo" do show up. Until the map is ready (or while there is
+  // no grid), the size is re-checked now and then, taking the one with which cargo cover a larger area.
+  // With plenty of cargo found the grid is real: no re-check.
   if (phase !== 'frozen' && cargo.size < REDETECT_MAX_CARGO && ++checkFrames >= REDETECT_AFTER) {
     checkFrames = 0;
     const P2 = Vision.detectPeriod(rp.w, rp.h, maps);
@@ -899,8 +873,8 @@ function analyze(src, rp) {
     }
   }
   if (!found) { lostGrid(now); return; }
-  // уточнення на частки пікселя приймаємо тихо; інший масштаб (×2) — це вже інша сітка.
-  // Готову схему не чіпає ніщо, крім кнопки «Шукати заново»: такий кадр просто пропускаємо.
+  // sub-pixel refinements are accepted quietly; a different scale (×2) is a different grid.
+  // Nothing but the "Scan again" button touches a ready map: such a frame is simply skipped.
   if (Math.abs(found.P - P) > P * 0.1) {
     if (phase === 'frozen') { lostGrid(now); return; }
     viewport = null; prevSig = null; ring = []; cargo = new Map(); results = new Map(); listTopR = null;
@@ -908,24 +882,24 @@ function analyze(src, rp) {
   }
   P = found.P;
   const grid = found.grid;
-  // вантаж у грі завжди сірий, порожній слот — чорний (інколи з крапкою).
-  // 1×1 не скануємо: краснух і нічого цінного в них не буває, а підтверджувати й читати їх — довго.
+  // cargo in the game is always grey, an empty slot is black (sometimes with a dot).
+  // 1×1 is not scanned: reds and anything valuable never drop from it, and confirming and reading them takes time.
   let items = found.items.filter(it => it.occ >= OCC_GREY && it.w * it.h > 1);
   if (!items.length) { lostGrid(now); return; }
-  // торговця закрили й відкрили знову посеред скану: це вже інший список
+  // the merchant was closed and reopened in the middle of a scan: this is a different list
   if (phase !== 'frozen' && gridSeenAt && now - gridSeenAt > REOPEN_MS && cargo.size) { log(tr('log.reopen')); resetScan(); }
   gridSeenAt = now;
 
-  // Видима частина списку. Найточніше її дає смуга прокрутки праворуч: доріжка — від верху до низу
-  // списку, повзунок — де ми в ньому. Без смуги (короткий список) — верх при першому виявленні:
-  // торговець відкривається зі списком нагорі. Вище висить заголовок «Mysterious Supplies», крізь
-  // який видно вантажі, що прокрутились; їх відкидаємо, і за прокруткою стежимо лише нижче нього.
-  // Смугу шукаємо цілком один раз, далі — лише повзунок на знайденій доріжці. Якщо смугу хоч раз
-  // бачили, кадр без повзунка пропускаємо: інший спосіб рахувати рядки зсунув би схему.
+  // The visible part of the list. The scrollbar on the right gives it most precisely: the track runs from the top to
+  // the bottom of the list, the thumb shows where we are in it. Without a scrollbar (a short list) — the top at first detection:
+  // the merchant opens with the list at the top. Above hangs the "Mysterious Supplies" header, through
+  // which scrolled cargo shows; it is dropped, and scrolling is tracked only below it.
+  // The whole scrollbar is searched once, later only the thumb on the track found. Once the scrollbar has been
+  // seen, a frame without a thumb is skipped: another way of counting rows would shift the map.
   let sb = Vision.scrollbar(G, grid, sbKnown);
   if (sb && !sbKnown) { sbKnown = { x: sb.x, trackTop: sb.trackTop, trackLen: sb.trackLen, thumbLen: sb.thumbLen }; log(tr('log.bar')); }
-  // Довжина повзунка змінюється лише разом зі списком (після купівлі). Раптом інша — курсор чи
-  // підказка зіпсували смугу: кадр пропускаємо. Нову довжину приймаємо, коли вона тримається.
+  // The thumb length changes only together with the list (after a purchase). Suddenly different: the cursor or
+  // a tooltip spoiled the scrollbar, the frame is skipped. A new length is accepted once it holds.
   if (sb && sbKnown && Math.abs(sb.thumbLen - sbKnown.thumbLen) > sbKnown.thumbLen * THUMB_TOLERANCE) {
     thumbOddCount = Math.abs(sb.thumbLen - thumbOddLen) <= 3 ? thumbOddCount + 1 : 1;
     thumbOddLen = sb.thumbLen;
@@ -933,13 +907,13 @@ function analyze(src, rp) {
     else sb = null;
   } else thumbOddCount = 0;
   if (!sb && sbKnown) {
-    // Смугу закрила рамка з ціною (вантаж біля правого краю). Схему не чіпаємо, а рамку все одно
-    // читаємо: поки курсор на вантажі, список не гортається, тож позиція — остання відома.
+    // The price tooltip covered the scrollbar (a cargo near the right edge). The map is left alone, but the tooltip is still
+    // read: while the cursor is on a cargo the list does not scroll, so the position is the last known one.
     const last = ring[ring.length - 1];
     if (phase === 'frozen' && now - captureOnset > QUIET_MS && last) { last.offset = offset; detectHover(last); }
     lastSeen = { grid, items }; updateStage(); return;
   }
-  if (!sb && ++noBarCount < NO_BAR_LIMIT) { lastSeen = { grid, items }; updateStage(); return; } // ще чекаємо смугу
+  if (!sb && ++noBarCount < NO_BAR_LIMIT) { lastSeen = { grid, items }; updateStage(); return; } // still waiting for the scrollbar
   const vpNew = sb
     ? { x: Math.round(grid.x0), y: sb.trackTop, w: Math.round(grid.cols * P), h: sb.trackLen }
     : { x: Math.round(grid.x0), y: Math.round(grid.y0), w: Math.round(grid.cols * P), h: Math.round(grid.rows * P) };
@@ -949,16 +923,16 @@ function analyze(src, rp) {
   } else if (!sb && grid.y0 + grid.rows * P > viewport.y + viewport.h + P / 2) {
     viewport.h = Math.round(grid.y0 + grid.rows * P - viewport.y);
   }
-  // лише вантажі в межах списку: вище — під заголовком, нижче — панель торговця
+  // only cargo within the list: above is under the header, below is the merchant panel
   items = items.filter(it => grid.y0 + it.r * P >= viewport.y - P * 0.2 && grid.y0 + (it.r + it.h) * P <= viewport.y + viewport.h + P * 0.2);
 
-  // номер рядка: зі смуги прокрутки (без накопичення похибки) або зі стеження за кадрами
+  // row number: from the scrollbar (no error accumulation) or from frame tracking
   const colOf = c => Math.round((grid.x0 + c * P - phaseX) / P);
   let n;
   if (sb) {
     const scrollPx = (sb.thumbTop - sb.trackTop) * sb.trackLen / sb.thumbLen;
     n = Math.round((grid.y0 - sb.trackTop + scrollPx) / P);
-    // рядків у списку стільки, скільки вміщує довжина вмісту; інше — помилка розпізнавання
+    // the list has as many rows as its content length allows; anything else is a recognition error
     const listRows = Math.ceil(sb.trackLen * sb.trackLen / sb.thumbLen / P) + 2;
     if (n < -grid.rows || n > listRows) { lastSeen = { grid, items }; updateStage(); return; }
     listTopR = 0;
@@ -967,17 +941,17 @@ function analyze(src, rp) {
   } else {
     n = relocate(items, colOf, Math.round((offset + grid.y0) / P));
     if (listTopR === null) listTopR = n;
-    sawTop = sawEnd = true; // увесь список видно одразу
+    sawTop = sawEnd = true; // the whole list is visible at once
   }
   offset = n * P - grid.y0;
   if (ring.length) ring[ring.length - 1].offset = offset;
-  // Вантаж, що впирається у верх видимої частини, може бути обрізаний заголовком: нижня рамка
-  // заголовка тоді грає роль його верхньої межі. Віримо такому лише в першому рядку списку.
+  // A cargo touching the top of the visible part may be cut off by the header: the bottom border of
+  // the header then acts as its top border. Such a cargo is trusted only in the first row of the list.
   items = items.filter(it => Math.abs(grid.y0 + it.r * P - viewport.y) > P * 0.3 || n + it.r === listTopR);
   lastSeen = { grid, items };
   readFeed(G, grid, now);
 
-  // поки вантаж тягнуть, картинка «брудна»: схему й еталони не чіпаємо
+  // while a cargo is dragged the picture is "dirty": the map and the references are left alone
   const quiet = now - captureOnset > QUIET_MS;
   const seen = new Set(), fresh = [];
   for (const it of items) {
@@ -989,23 +963,23 @@ function analyze(src, rp) {
   }
 
   if (phase === 'scan' && quiet) {
-    // Під час скану нічого не видаляємо: межу деяких вантажів то видно, то ні, і схема мигала б.
-    // Суперечки між варіантами вирішує голосування (placedCargo), а перестановку — новий скан.
+    // Nothing is deleted during the scan: some cargo borders come and go, and the map would flicker.
+    // Disputes between variants are settled by voting (placedCargo), and a reshuffle by a new scan.
     for (const f of fresh) {
       cargo.set(f.key, { C: f.C, R: f.R, w: f.it.w, h: f.it.h, votes: 0, base: null, thumb: null });
       seen.add(f.key);
     }
-    // схему зібрано: бачили і верх, і низ списку, а серед видимих нема нових чи ще не підтверджених
+    // the map is built: both the top and the bottom of the list were seen, and nothing visible is new or unconfirmed
     const unsure = [...seen].some(k => cargo.get(k).votes + 1 < MIN_VOTES);
     stableCount = unsure ? 0 : stableCount + 1;
     if (sawTop && sawEnd && cargo.size && stableCount >= FREEZE_STABLE) freeze(tr('log.frozen', { n: placedCargo().length }));
   } else if (phase === 'frozen' && quiet) {
-    // Заморожена схема не реагує ні на мишку, ні на рамки з ціною, ні на купівлю: після покупки
-    // гравець сам тисне «Шукати заново». Інакше рамка, що висить над вантажами, зривала схему.
+    // A frozen map ignores the mouse, price tooltips and purchases: after a purchase
+    // the player presses "Scan again". Otherwise a tooltip hanging over cargo would break the map.
     const frozenKeys = new Set(frozenPlaced.map(([k]) => k));
-    // Дозаповнення: вантаж, якого бракувало (скажімо, верхній ряд не встиг підтвердитись до заморозки),
-    // додаємо, коли його впевнено бачили кілька разів і він не перекриває жодного відомого.
-    // Наявні вантажі готової схеми не змінюються ніколи.
+    // Filling in: a missing cargo (say, the top row did not get confirmed before freezing)
+    // is added once it has been seen confidently several times and overlaps nothing known.
+    // Existing cargo of a ready map never change.
     for (const f of fresh) {
       cargo.set(f.key, { C: f.C, R: f.R, w: f.it.w, h: f.it.h, votes: 0, base: null, thumb: null });
       seen.add(f.key);
@@ -1029,15 +1003,15 @@ function analyze(src, rp) {
     updateReveal(rec, Vision.meanColor(rgba, rp.w, x + P * 0.1, y + P * 0.3, it.w * P - P * 0.2, it.h * P - P * 0.4));
     if (quiet) readLabel(rec, x, y, it.w * P, it.h * P);
   }
-  // еталон вигляду видимих вантажів для пошуку потягнутого
+  // appearance reference of the visible cargo, for finding the dragged one
   const last = ring[ring.length - 1];
   if (quiet && last) for (const key of seen) {
     const rec = cargo.get(key);
     const patch = cargoPatch(rec, last);
     if (!patch) continue;
     const red = Vision.meanOf(cargoPatch(rec, last, 'red'));
-    if (red >= RED_MIN) continue; // ще червоний після перетягування
-    // рамка з ціною всередині великого вантажу не ламає його межі — такий кадр в еталон не беремо
+    if (red >= RED_MIN) continue; // still red after dragging
+    // a price tooltip inside a large cargo does not break its borders: such a frame is not taken as a reference
     if (phase === 'frozen' && rec.base && rec.base.length === patch.length && Vision.patchDiff(patch, rec.base) > BASE_UPDATE_MAX) continue;
     rec.base = patch;
     rec.baseRed = red;
@@ -1059,8 +1033,8 @@ function freeze(message) {
   updateStage();
 }
 
-// Розвіддані: гра фарбує розкритий вантаж у колір якості предмета. Колір має триматися кілька
-// розборів поспіль — червоний слід від перетягування тримається недовго.
+// Intel: the game paints a revealed cargo in the color of the item quality. The color must hold for several
+// parses in a row: the red trace from dragging lasts only briefly.
 function updateReveal(rec, [r, g, b]) {
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), sat = mx ? (mx - mn) / mx : 0;
   let q = null;
@@ -1076,7 +1050,7 @@ function updateReveal(rec, [r, g, b]) {
   if (rec.revealStreak >= REVEAL_STREAK) rec.revealed = q;
 }
 
-// Площа, яку займають знайдені вантажі (px²): у справжньої сітки торговця вона велика
+// Area covered by the cargo found (px²): for the real merchant grid it is large
 function gridCoverage(found) {
   if (!found) return 0;
   return found.items.filter(it => it.occ >= OCC_GREY).reduce((a, it) => a + it.w * it.h, 0) * found.P * found.P;
@@ -1087,19 +1061,19 @@ function lostGrid(now) {
   updateStage();
 }
 
-// Чи вантаж зі схеми зараз повністю у видимій частині списку
+// Whether a map cargo is now fully inside the visible part of the list
 function fullyVisible(rec, grid, colOf) {
   const top = rec.R * P - offset, bottom = (rec.R + rec.h) * P - offset;
   const c0 = colOf(0), c1 = colOf(grid.cols);
-  // у самому верху вантаж не підтверджується (див. analyze), тож і зниклим його там не вважаємо
+  // at the very top a cargo is not confirmed (see analyze), so it is not considered gone there either
   const clearOfHeader = top > viewport.y + P * 0.3 || rec.R === listTopR;
   return clearOfHeader && top >= viewport.y - 2 && bottom <= Math.min(viewport.y + viewport.h, grid.y0 + grid.rows * P) + 2
     && rec.C >= c0 && rec.C + rec.w <= c1;
 }
 
-// Якщо прокрутку не встигли відстежити (різкий скрол), шукаємо, де видимі вантажі збігаються
-// з уже знайденою схемою. Розклад розмірів вантажів майже завжди унікальний.
-// Поріг високий: після купівлі вантажі переставлені, і слабкий збіг деінде був би випадковим.
+// If scrolling was not tracked in time (a sharp scroll), look for where the visible cargo match
+// the map already found. The layout of cargo sizes is almost always unique.
+// The threshold is high: after a purchase cargo are reshuffled, and a weak match elsewhere would be accidental.
 function relocate(items, colOf, n) {
   if (items.length < 3 || cargo.size < 3) return n;
   const score = m => items.reduce((s, it) => s + (cargo.has(`${colOf(it.c)},${m + it.r},${it.w},${it.h}`) ? 1 : 0), 0);
@@ -1121,7 +1095,7 @@ function makeThumb(x, y, w, h) {
   return c;
 }
 
-// Прямокутник вантажу в маленькому кадрі (без рамок), або null, якщо не видно повністю
+// Cargo rectangle in the small frame (without borders), or null if it is not fully visible
 function cargoRect(rec, frameOffset) {
   const x = (phaseX + rec.C * P - viewport.x) / TRACK_SX, y = (rec.R * P - frameOffset - viewport.y) / TRACK_SY;
   const inX = 3 / TRACK_SX, inY = 3 / TRACK_SY;
@@ -1138,8 +1112,8 @@ function cargoPatch(rec, frame, channel = 'small') {
   return r ? Vision.crop({ w: smallCanvas.width, g: frame[channel] }, r.x, r.y, r.w, r.h) : null;
 }
 
-// Вантаж, який потягнули. Коли вантаж смикаєш, на його місці лишається слабкий червоний слід,
-// а сам він їде за курсором трохи вниз (на сусіда, але сірим, тож червоного там нема).
+// The dragged cargo. When a cargo is dragged, a faint red trace stays in its place,
+// and the cargo itself follows the cursor a bit down (onto a neighbour, but grey, so there is no red there).
 function pickCargo(onset) {
   const frames = ring.filter(f => f.t >= onset - 150 && f.t <= onset + 700);
   if (!frames.length) return null;
@@ -1156,21 +1130,21 @@ function pickCargo(onset) {
     red.push({ key, s: r });
     gray.push({ key, s: g });
   }
-  // головна ознака — червоний слід; якщо його не видно, береться найбільша зміна взагалі
+  // the main sign is the red trace; if it is not visible, the biggest change overall is taken
   return best(red, RED_MIN, 1.5) || best(gray, PICK_MIN_DIFF, 1.25);
 }
 
 function best(scored, min, ratio) {
   scored.sort((a, b) => b.s - a.s);
   if (!scored.length || scored[0].s < min) return null;
-  if (scored[1] && scored[0].s < scored[1].s * ratio) return null; // два вантажі змінились однаково: не вгадуємо
+  if (scored[1] && scored[0].s < scored[1].s * ratio) return null; // two cargo changed equally: no guessing
   return scored[0].key;
 }
 
-// Вантажі без перекриттів. Вантаж зʼявляється на схемі, коли його підтвердили кілька кадрів, а при
-// суперечці (межу то видно, то ні) перемагає той варіант, який бачили частіше, — так схема не мигає.
+// Cargo without overlaps. A cargo appears on the map once several frames confirmed it, and in a
+// dispute (a border that comes and goes) the variant seen more often wins, so the map does not flicker.
 function placedCargo() {
-  if (phase === 'frozen' && frozenPlaced) return frozenPlaced; // готова схема не змінюється до перескану
+  if (phase === 'frozen' && frozenPlaced) return frozenPlaced; // a ready map does not change until a rescan
   const taken = new Set(), out = [];
   const list = [...cargo.entries()].filter(([, r]) => r.votes >= MIN_VOTES)
     .sort((a, b) => b[1].votes - a[1].votes || (b[1].seen || 0) - (a[1].seen || 0));
@@ -1185,15 +1159,15 @@ function placedCargo() {
   return out;
 }
 
-// Межа між вантажами — надійний доказ: сама по собі на сітці вона не зʼявляється, а от зникнути під
-// довгим написом може. Тож якщо великий вантаж повністю складається з менших, які теж часто бачили,
-// вірим меншим.
+// A border between cargo is reliable evidence: it never appears on the grid by itself, but it can vanish under
+// a long label. So if a large cargo consists entirely of smaller ones that were also seen often,
+// the smaller ones are trusted.
 function splitBetter(rec, list) {
   if (rec.w * rec.h < 2) return false;
   const inside = list.map(([, r]) => r).filter(r => r !== rec && r.w * r.h < rec.w * rec.h
     && r.C >= rec.C && r.R >= rec.R && r.C + r.w <= rec.C + rec.w && r.R + r.h <= rec.R + rec.h
     && r.votes >= rec.votes * SPLIT_SHARE);
-  // чи покривають вони всі клітинки великого рівно по одному разу (жадібно, від найчастіших)
+  // whether they cover every cell of the large one exactly once (greedy, most frequent first)
   const cells = new Map();
   for (const r of inside.sort((a, b) => b.votes - a.votes)) {
     const own = [];
@@ -1208,9 +1182,9 @@ function labelName(label) {
   return label.mystery ? MYSTERY_TIERS[label.mystery].name : label.name;
 }
 
-// ---------- Ціна з рамки ----------
-// Пули торговця, що відповідають ціні (і напису) вантажу. Торговець накидає ~10%, тож ціна з рамки
-// може збігатися з ціною пулу як є, так і з націнкою; беремо найближчу.
+// ---------- Price from the tooltip ----------
+// Merchant pools matching the cargo price (and label). The merchant adds ~10%, so the tooltip price
+// may match a pool price as is or with the markup; the closest is taken.
 function poolsForPrice(price, label) {
   let pools = libPools.filter(pl => !profile || String(pl.profile) === String(profile));
   if (label && label.mystery) pools = pools.filter(pl => pl.mixed);
@@ -1222,7 +1196,7 @@ function poolsForPrice(price, label) {
   return pools.filter(pl => dist(pl.price) <= best + 1e-9);
 }
 
-// Імовірність кожного предмета серед цих пулів: id → вага
+// Probability of each item among these pools: id → weight
 function priceWeights(pools) {
   const out = new Map();
   const tw = pools.reduce((a, pl) => a + pl.weight, 0) || 1;
@@ -1234,7 +1208,7 @@ function priceWeights(pools) {
   return out;
 }
 
-// Усе відоме про вантаж для розрахунку шансів: напис, ціна і ваги предметів за ціною
+// Everything known about a cargo for the odds: label, price and item weights by price
 function cargoInfo(rec) {
   if (!rec) return null;
   const info = { ...(rec.label || {}) };
@@ -1246,7 +1220,7 @@ function cargoInfo(rec) {
   return Object.keys(info).length ? info : null;
 }
 
-// Шанс краснухи для вантажу ще до звуку: за написом, ціною й розміром
+// Red chance of a cargo before any sound: by label, price and size
 function cargoRedOdds(rec) {
   const info = cargoInfo(rec);
   if (info && info.category) return { red: 0, items: [] };
@@ -1267,8 +1241,8 @@ function cargoRedOdds(rec) {
   return { red: red / total, items };
 }
 
-// Наведення: рамку з ціною видно як вантажі, що раптом стали не схожі на свій еталон. Читаємо її,
-// і вантаж під лівим верхнім кутом рамки (там курсор) стає «наведеним»: наступний звук — його.
+// Hover: a price tooltip shows up as cargo that suddenly stopped looking like their reference. It is read,
+// and the cargo under the tooltip's top-left corner (where the cursor is) becomes "hovered": the next sound is its.
 function detectHover(frame) {
   if (hoverBusy || typeof Ocr === 'undefined' || !libPools.length) return;
   const changed = [];
@@ -1277,39 +1251,39 @@ function detectHover(frame) {
     const p = cargoPatch(rec, frame);
     if (p && p.length === rec.base.length && Vision.patchDiff(p, rec.base) > HOVER_DIFF) changed.push(rec);
   }
-  detectHover.changed = changed.length; // для діагностики
+  detectHover.changed = changed.length; // for diagnostics
   if (!changed.length || changed.length > HOVER_MAX_CARGO) { hoverSig = ''; return; }
   const sig = changed.map(r => `${r.C},${r.R}`).sort().join(';');
-  if (sig === hoverSig) return; // цю рамку вже прочитали
+  if (sig === hoverSig) return; // this tooltip was already read
   hoverSig = sig;
-  // прямокутник змінених вантажів у кадрі (з запасом)
+  // rectangle of the changed cargo in the frame (with a margin)
   const off = offset, px0 = phaseX;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const r of changed) {
     x0 = Math.min(x0, px0 + r.C * P); y0 = Math.min(y0, r.R * P - off);
     x1 = Math.max(x1, px0 + (r.C + r.w) * P); y1 = Math.max(y1, (r.R + r.h) * P - off);
   }
-  // Рамка — праворуч знизу від курсора, ~3 клітинки завширшки й ~1.5 заввишки. Вона може виходити за
-  // змінені вантажі (за край сітки, на порожні слоти), тож вирізаємо щонайменше такий прямокутник;
-  // угору й уліво — із запасом, бо курсор може бути над вантажем, якого нема на схемі.
+  // The tooltip is below and to the right of the cursor, ~3 cells wide and ~1.5 tall. It may extend past
+  // the changed cargo (past the grid edge, over empty slots), so at least such a rectangle is cropped;
+  // up and left with a margin, as the cursor may be over a cargo that is not on the map.
   x1 = Math.max(x1, x0 + P * TIP_W); y1 = Math.max(y1, y0 + P * TIP_H);
   x0 = Math.max(0, Math.round(x0 - P * 0.4)); y0 = Math.max(0, Math.round(y0 - P * 0.7));
   x1 = Math.min(fullCanvas.width, Math.round(x1 + P * 0.3)); y1 = Math.min(fullCanvas.height, Math.round(y1 + P * 0.3));
   if (x1 - x0 < P / 2 || y1 - y0 < P / 2) return;
   hoverBusy = true;
-  // спершу — точно саму рамку (без сусідніх написів), а якщо її не видно — весь шматок
+  // first exactly the tooltip itself (without neighbouring labels), and if it is not visible, the whole patch
   const box = Ocr.findTipBox(fullCanvas, x0, y0, x1 - x0, y1 - y0, P);
   const whole = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   const read = r => { const cv = Ocr.tipCanvas(fullCanvas, r.x, r.y, r.w, r.h, P); return Ocr.readData(cv).then(data => ({ r, data, tip: Ocr.parseTip(data, cv.ocrScale) })); };
   (box ? read(box).then(res => res.tip ? res : read(whole)) : read(whole)).then(({ r, data, tip }) => {
-    detectHover.text = data.text; // для діагностики
+    detectHover.text = data.text; // for diagnostics
     if (!tip) { hoverSig = ''; return; }
-    // курсор — біля лівого верхнього кута рамки: трохи лівіше й вище назви (або рядка з ціною)
+    // the cursor is near the tooltip's top-left corner: slightly left of and above the label (or the price line)
     const cx = r.x + (tip.labelBox ? tip.labelBox.x0 - P * 0.25 : tip.priceBox.x0 - P * 0.55);
     const cy = r.y + (tip.labelBox ? tip.labelBox.y0 - P * 0.35 : tip.priceBox.y0 - P * 0.75);
     const C = Math.floor((cx - px0) / P), R = Math.floor((cy + off) / P);
     const hit = placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
-    detectHover.last = { sig, text: data.text, C, R, hit: !!hit }; // для діагностики
+    detectHover.last = { sig, text: data.text, C, R, hit: !!hit }; // for diagnostics
     if (!hit) return;
     const [key, rec] = hit;
     rec.price = tip.price;
@@ -1320,7 +1294,7 @@ function detectHover(frame) {
   }).catch(() => { hoverSig = ''; }).finally(() => { hoverBusy = false; });
 }
 
-// Картка наведеного вантажу: чи може бути краснуха за написом і ціною, ще до звуку
+// Card of the hovered cargo: whether it can be red by label and price, before any sound
 function showHover(rec) {
   const odds = cargoRedOdds(rec);
   const label = rec.label;
@@ -1329,7 +1303,6 @@ function showHover(rec) {
   ui.result.style.borderColor = color;
   ui.result.style.background = color + '1a';
   const title = red === null ? tr('hover.title') : red >= 0.995 ? tr('card.red') : red > 0 ? tr('hover.maybe', { p: pct(red) }) : tr('hover.none');
-  ui.result.dataset.kind = 'hover';
   ui.result.innerHTML = `
     <div class="big" style="color:${color}">${title}</div>
     <div class="sub">${esc(cargoHead(rec))}. ${esc(tr('hover.drag'))}</div>
@@ -1337,19 +1310,19 @@ function showHover(rec) {
     ${odds ? itemTiles(odds.items) : ''}`;
 }
 
-// «Rare Mystery Cargo · 2×2 · 470 000» — що відомо про вантаж
+// "Rare Mystery Cargo · 2×2 · 470,000": what is known about the cargo
 function cargoHead(rec) {
   return [rec.label && labelName(rec.label), normSize(`${rec.w}x${rec.h}`).replace('x', '×'), rec.price && fmtPrice(rec.price)]
     .filter(Boolean).join(' · ');
 }
 
-// Читаємо напис вантажу (асинхронно, через Tesseract). Вирізаємо зараз, бо кадр зміниться.
+// Read the cargo label (asynchronously, with Tesseract). Crop now, as the frame will change.
 function readLabel(rec, x, y, w, h) {
   if (rec.label || rec.labelBusy || (rec.labelTries || 0) >= LABEL_TRIES || typeof Ocr === 'undefined') return;
   rec.labelBusy = true;
   const crop = Ocr.labelCanvas(fullCanvas, x, y, w, h, P);
   readLabel.n = (readLabel.n || 0) + 1;
-  Ocr.read(crop, readLabel.n % 2 ? 'label' : 'label2') // два розпізнавачі по черзі — написи зʼявляються вдвічі швидше
+  Ocr.read(crop, readLabel.n % 2 ? 'label' : 'label2') // two readers in turn: labels appear twice as fast
     .then(text => {
       rec.labelTries = (rec.labelTries || 0) + 1;
       const label = Ocr.parseLabel(text);
@@ -1359,23 +1332,23 @@ function readLabel(rec, x, y, w, h) {
     .finally(() => { rec.labelBusy = false; });
 }
 
-// ---------- Покупки ----------
-// Після купівлі гра пише над сіткою: «нік spent 200,000 Koen on a mystery cargo and obtained [предмет]».
-// Такі рядки бувають і про чужі покупки, а ніки ми не зберігаємо взагалі. Свою покупку впізнаємо
-// за балансом під сіткою («Owned: 624,605»): він зменшився рівно на суму з рядка — купив ти.
-// Тоді шукаємо вантаж, звук якого чули і чия ціна з рамки збігається з сумою.
+// ---------- Purchases ----------
+// After a purchase the game writes above the grid: "nick spent 200,000 Koen on a mystery cargo and obtained [item]".
+// Such lines also appear for other players' purchases, and nicknames are not stored at all. Own purchase is recognized
+// by the balance below the grid ("Owned: 624,605"): it dropped by exactly the line amount, so you bought it.
+// Then the cargo whose sound was heard and whose tooltip price matches the amount is looked up.
 function readFeed(G, grid, now) {
   if (feedBusy || now - feedAt < FEED_MS || typeof Ocr === 'undefined' || !viewport) return;
   feedAt = now;
   const x = Math.max(0, Math.round(grid.x0)), w = Math.round(Math.min(grid.cols * P, G.w - x));
   const y = Math.max(0, Math.round(viewport.y - P * FEED_TOP)), h = Math.round(viewport.y - P * FEED_BOTTOM) - y;
-  // баланс — у правій половині під списком
+  // the balance is in the right half below the list
   const bx = Math.round(grid.x0 + grid.cols * P * BALANCE_LEFT), bw = Math.round(Math.min(grid.x0 + grid.cols * P + P * 0.3, G.w) - bx);
   const by = Math.round(viewport.y + viewport.h), bh = Math.round(Math.min(G.h, by + P * BALANCE_BELOW) - by);
   const changed = (r, prev) => {
     if (r.w < P * 2 || r.h < P * 0.25) return null;
     const sig = Vision.crop(G, r.x, r.y, r.w, r.h);
-    return prev && prev.length === sig.length && Vision.patchDiff(sig, prev) < 2 ? null : sig; // той самий — не читаємо
+    return prev && prev.length === sig.length && Vision.patchDiff(sig, prev) < 2 ? null : sig; // the same one: not read again
   };
   const feedR = { x, y, w, h }, balR = { x: bx, y: by, w: bw, h: bh };
   const fs = changed(feedR, feedSig), bs = changed(balR, balanceSig);
@@ -1384,7 +1357,7 @@ function readFeed(G, grid, now) {
   if (bs) balanceSig = bs;
   feedBusy = true;
   const read = r => Ocr.readData(Ocr.tipCanvas(fullCanvas, r.x, r.y, r.w, r.h, P), 'label').then(d => d.text);
-  // спершу баланс: рядок про покупку й зменшення балансу зазвичай зʼявляються разом
+  // the balance first: the purchase line and the balance drop usually appear together
   (bs ? read(balR).then(t => { const v = Ocr.parseBalance(t); if (v) onBalance(v); }) : Promise.resolve())
     .then(() => fs ? read(feedR).then(t => { const f = Ocr.parseFeed(t); if (f) onFeed(f); }) : null)
     .catch(() => { feedSig = balanceSig = null; })
@@ -1396,8 +1369,8 @@ function onBalance(v) {
   balance = v;
 }
 
-// Рядок стрічки чекає в черзі, доки баланс не підтвердить (чи не спростує) покупку.
-// Той самий рядок, прочитаний трохи інакше («Rebrut»/«Rebcut»), — та сама покупка: вдруге не додаємо.
+// A feed line waits in the queue until the balance confirms (or refutes) the purchase.
+// The same line read slightly differently ("Rebrut"/"Rebcut") is the same purchase: not added twice.
 function onFeed(feed) {
   const now = performance.now();
   const dup = feedQueue.concat(feedDone).some(f => f.price === feed.price && now - f.at < FEED_SAME_MS && Ocr.matchName(f.item, [{ name: feed.item }]));
@@ -1409,7 +1382,7 @@ function processFeed() {
   feedQueue = feedQueue.filter(f => now - f.at < FEED_WAIT_MS);
   feedDone = feedDone.filter(f => now - f.at < FEED_SAME_MS);
   for (const f of [...feedQueue]) {
-    if (spent < f.price * (1 - BUY_MATCH)) continue; // баланс на цю суму не зменшувався — купив хтось інший
+    if (spent < f.price * (1 - BUY_MATCH)) continue; // the balance did not drop by this amount: someone else bought it
     spent = Math.max(0, spent - f.price);
     feedQueue.splice(feedQueue.indexOf(f), 1);
     feedDone.push(f);
@@ -1418,8 +1391,8 @@ function processFeed() {
 }
 
 function ownPurchase({ price, item }) {
-  // вантаж зі звуком, чия ціна з рамки збігається з сумою; з кількох — той, що чули останнім;
-  // ціни не знали (не наводили) — останній почутий звук за 3 хв; інакше лише в історію
+  // the cargo with a sound whose tooltip price matches the amount; of several, the one heard last;
+  // if the price was unknown (no hover), the last sound heard within 3 min; otherwise history only
   const byPrice = [...results].filter(([key]) => {
     const rec = cargo.get(key);
     return rec && rec.price && !rec.bought && Math.abs(rec.price - price) <= price * BUY_MATCH;
@@ -1430,7 +1403,7 @@ function ownPurchase({ price, item }) {
   recordPurchase({ soundId: res && res.soundId, size: rec ? normSize(`${rec.w}x${rec.h}`) : '', label: cargoInfo(rec), price, itemText: item, key });
 }
 
-// Записати покупку. itemId — якщо предмет уже відомий (клік по плитці), інакше шукаємо за назвою.
+// Records a purchase. itemId if the item is already known, otherwise it is looked up by name.
 function recordPurchase({ soundId, size, label, price, itemText, itemId, key }) {
   const sound = soundId && soundById(soundId);
   let it = itemId != null ? itemById.get(itemId) || (sound && sound.items.find(x => String(x.id) === String(itemId))) : null;
@@ -1449,8 +1422,6 @@ function recordPurchase({ soundId, size, label, price, itemText, itemId, key }) 
   savePurchases();
   syncBase();
   if (rec) rec.bought = it || true;
-  log(tr('log.bought', { sound: sound ? soundName(sound) : tr('buys.noSound'), price: price ? fmtPrice(price) : '—', item: it ? itemName(it) : itemText }));
-  renderPurchases();
   drawMap();
 }
 
@@ -1459,7 +1430,7 @@ function savePurchases() {
   try { localStorage.setItem(PURCHASES_KEY, JSON.stringify(purchases)); } catch {}
 }
 
-// Спільна база: з папки програми і найсвіжіша з GitHub (якщо є інтернет) — обʼєднуємо обидві
+// Shared base: from the app folder and the freshest from GitHub (if online), both merged
 async function loadBase() {
   const get = async url => {
     try {
@@ -1472,14 +1443,12 @@ async function loadBase() {
   const [local, remote] = await Promise.all([get(BASE_URL), get(BASE_REMOTE)]);
   basePurchases = mergePurchases(local, remote);
   allCache = null;
-  renderPurchases();
-  syncBase(); // свої покупки, яких ще нема в базі (скажімо, записані до цієї версії)
-  if (lastResult) { const s = soundById(lastResult.soundId); if (s && ui.result.dataset.kind === 'sound' && cardCtx) showResult(s, lastResult.score, null, cardCtx.size, cardCtx.label); }
+  syncBase(); // own purchases not yet in the local file (say, recorded before this version)
   drawMap();
 }
 
-// Свої покупки самі йдуть у локальну базу (library/purchases.json через локальний сервер), а звідти
-// при наступному запуску sync.ps1 шле їх на спільний сервер. Без сервера (сайт не через start.bat) — тихо пропускаємо.
+// Own purchases go to a local file (purchases.mine.json via the local server), and from there
+// sync.ps1 sends them to the shared server on the next launch. Without the server (site not via start.bat) this is skipped quietly.
 let syncBusy = false;
 const SHARE_LABELS = new Set(['', ...Object.values(MYSTERY_TIERS).map(t => t.name), 'Military Items', 'Medical Supplies', 'Computer Parts',
   'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials', 'Electronics', 'Flammables', 'Tools', 'Paper']);
@@ -1491,8 +1460,8 @@ function shareable(b) {
 async function syncBase() {
   if (syncBusy || !location.protocol.startsWith('http')) return;
   syncBusy = true;
-  // У спільну базу — без вільного тексту: назва предмета з довідника, напис — лише відомий.
-  // Так туди ніяк не потрапить нік чи інший шматок рядка з екрана.
+  // No free text into the shared base: item name from the catalog, label only a known one.
+  // This way a nickname or any other piece of a screen line can never get in.
   const mine = purchases.map(shareable).filter(Boolean);
   try {
     await fetch('api/purchases', {
@@ -1500,24 +1469,6 @@ async function syncBase() {
       body: JSON.stringify({ updated: new Date().toISOString(), purchases: mine }, null, 1),
     });
   } catch {} finally { syncBusy = false; }
-}
-
-function renderPurchases() {
-  const el = $('buys');
-  const red = allPurchases().filter(b => b.q === 'red').length;
-  $('buysSummary').textContent = tr('buys.summary', { base: basePurchases.length, mine: purchases.length, red });
-  if (!purchases.length) { el.innerHTML = `<p class="muted">${esc(tr('buys.empty'))}</p>`; return; }
-  el.innerHTML = purchases.slice(-BUY_SHOWN).reverse().map(b => {
-    const it = b.itemId != null ? itemById.get(b.itemId) : null;
-    const s = b.soundId && soundById(b.soundId);
-    const time = new Date(b.t).toLocaleString(I18n.locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    const meta = [time, s ? soundName(s) : tr('buys.noSound'), b.size, b.label, b.price ? fmtPrice(b.price) : ''].filter(Boolean).join(' · ');
-    return `<div class="buy">
-      ${it && it.img ? `<img src="${it.img}" alt="">` : '<img alt="">'}
-      <div class="grow"><div style="color:${b.q && qById[b.q] ? qById[b.q].color : 'inherit'}">${esc(it ? itemName(it) : b.item || '?')}</div><div class="meta">${esc(meta)}</div></div>
-      <button class="small danger" data-del="${b.t}" title="${esc(tr('buys.del'))}">✕</button>
-    </div>`;
-  }).join('');
 }
 
 function cargoName(key) {
@@ -1534,7 +1485,7 @@ function mapBounds() {
   };
 }
 
-// ---------- Етапи ----------
+// ---------- Stages ----------
 function updateStage() {
   const count = placedCargo().length;
   ui.rescan.hidden = !(stream && count);
@@ -1550,7 +1501,7 @@ function updateStage() {
   ui.stageHint.textContent = hint;
 }
 
-// ---------- Малювання схеми ----------
+// ---------- Map drawing ----------
 function drawMap() {
   try { drawMapInner(); }
   catch (e) {
@@ -1583,7 +1534,7 @@ function drawMapInner() {
     if (rec.thumb) { c.globalAlpha = 0.35; c.drawImage(rec.thumb, x + 2, y + 2, w - 4, h - 4); c.globalAlpha = 1; }
 
     if (rec.bought) {
-      // уже куплений: притушений, з тим, що випало
+      // already bought: dimmed, with what dropped
       c.fillStyle = 'rgba(11,12,15,.7)';
       c.fillRect(x + 2, y + 2, w - 4, h - 4);
       if (rec.bought.img) { c.globalAlpha = 0.6; drawItemIcon(c, rec.bought, x + 8, y + 8, w - 16, h - 16); c.globalAlpha = 1; }
@@ -1600,7 +1551,7 @@ function drawMapInner() {
     const label = rec.label;
     if (!sound) {
       if (label && label.category && !revealed) {
-        // не Mystery Cargo: краснухи тут не буває — притушуємо
+        // not Mystery Cargo: reds never drop here, dimmed
         c.fillStyle = 'rgba(11,12,15,.6)';
         c.fillRect(x + 2, y + 2, w - 4, h - 4);
         c.strokeStyle = '#2a2f38'; c.lineWidth = 1;
@@ -1608,7 +1559,7 @@ function drawMapInner() {
         continue;
       }
       if (label && label.mystery && !revealed) {
-        // Mystery Cargo: тут може бути краснуха; рамка й підпис за рівнем
+        // Mystery Cargo: may hold a red; border and caption by tier
         const tier = MYSTERY_TIERS[label.mystery];
         c.strokeStyle = tier.color; c.lineWidth = 2;
         c.strokeRect(x + 3, y + 3, w - 6, h - 6);
@@ -1619,7 +1570,7 @@ function drawMapInner() {
         c.fillStyle = tier.color;
         c.fillText(text, x + w / 2, y + h - 4);
       } else if (revealed) {
-        // розвіддані: гра сама показала якість
+        // intel: the game itself showed the quality
         c.fillStyle = revealed.color + '55';
         c.fillRect(x + 2, y + 2, w - 4, h - 4);
         c.strokeStyle = revealed.color; c.lineWidth = 3;
@@ -1634,7 +1585,7 @@ function drawMapInner() {
       c.fillStyle = '#8b93a1'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText('?', x + 6, y + 5);
       if (rec.price) {
-        // ціна з рамки й шанс краснухи за нею (ще до звуку)
+        // tooltip price and the red chance by it (before any sound)
         const odds = cargoRedOdds(rec);
         c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'right';
         c.lineWidth = 3; c.strokeStyle = '#000';
@@ -1648,8 +1599,8 @@ function drawMapInner() {
     const size = `${rec.w}x${rec.h}`;
     const info = cargoInfo(rec);
     const red = qualityOdds(sound, size, info).red || 0;
-    // Як у грі: у комірці — можливі предмети з картинкою, смужкою якості й шансом; краснухи першими.
-    // Якщо предмет один (чи майже напевно) — одна велика картинка.
+    // As in the game: the cell shows possible items with a picture, quality bar and chance; reds first.
+    // If there is one item (or nearly certain), one big picture.
     const cands = itemOdds(sound, size, info).filter(x => x.p >= 0.02);
     const top = cands.slice().sort((a, b) => b.p - a.p)[0];
     c.fillStyle = red > 0 ? 'rgba(127,29,29,.55)' : '#15181d';
@@ -1678,7 +1629,7 @@ function drawMapInner() {
   }
 }
 
-// Картинка предмета, вписана в прямокутник зі збереженням пропорцій
+// Item picture fitted into a rectangle keeping the proportions
 function drawItemIcon(c, it, x, y, w, h) {
   const img = it.img && cachedImage(it.img);
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -1687,7 +1638,7 @@ function drawItemIcon(c, it, x, y, w, h) {
   c.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
 }
 
-// Підказка над схемою: що відомо про вантаж під мишкою
+// Popup over the map: what is known about the cargo under the mouse
 function showMapPop(e) {
   const key = mapCargoAt(e);
   const rec = key && cargo.get(key);
@@ -1723,7 +1674,7 @@ function canvasPos(canvas, e) {
   return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
 }
 
-// ---------- Сигнал ----------
+// ---------- Beep ----------
 function beep(redChance) {
   beepCtx = beepCtx || new AudioContext();
   const pattern = redChance >= 0.5 ? [1320, 1320, 1320] : redChance > 0 ? [990, 1320] : [520];
@@ -1738,11 +1689,11 @@ function beep(redChance) {
     o.start(t); o.stop(t + 0.13);
     t += 0.16;
   }
-  // системне аудіо захоплює і наш писк, тож ігноруємо його
+  // system audio also captures our own beep, so it is ignored
   muteUntil = performance.now() + pattern.length * 160 + 300;
 }
 
-// ---------- База звуків ----------
+// ---------- Sound base ----------
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function soundById(id) { return sounds.find(s => s.id === id); }
 function order(q) { return QUALITIES.findIndex(x => x.id === q); }
@@ -1756,7 +1707,7 @@ function normalizeSounds(list) {
       nameEn: typeof s.nameEn === 'string' ? s.nameEn : '',
       lib: !!s.lib,
       dur: +s.dur || 0,
-      waves: (Array.isArray(s.waves) ? s.waves : []).filter(w => typeof w === 'string'), // свої записи
+      waves: (Array.isArray(s.waves) ? s.waves : []).filter(w => typeof w === 'string'), // own recordings
       items: (s.items || []).filter(it => it && qById[it.q]).map(it => ({
         id: +it.id || 0,
         name: String(it.name || '?'), nameEn: typeof it.nameEn === 'string' ? it.nameEn : '', q: it.q, w: Math.max(0, +it.w || 0) || (it.wp ? 0 : 1),
@@ -1775,7 +1726,7 @@ function loadSounds() {
   try {
     const cur = localStorage.getItem(STORE_KEY);
     if (cur) return normalizeSounds(JSON.parse(cur));
-    // стара версія: предмети лишаємо, а записані зразки мали інший формат
+    // old version: items are kept, the recorded samples had another format
     for (const key of OLD_STORE_KEYS) {
       const old = localStorage.getItem(key);
       if (old) return normalizeSounds(JSON.parse(old).filter(s => !s.lib));
@@ -1873,7 +1824,7 @@ function addItem(el, s) {
   saveSounds();
 }
 
-// Зменшує картинку до 96×96, щоб база не роздувалась
+// Shrinks a picture to 96×96 so the base does not bloat
 async function resizeImage(file) {
   const bmp = await createImageBitmap(file);
   const size = 96, k = Math.min(size / bmp.width, size / bmp.height, 1);
@@ -1888,8 +1839,8 @@ function setRecording(id) {
   renderSounds();
 }
 
-// ---------- Рівень звуку ----------
-// Кожні 10 мс — стовпчик гучності; позначка зверху — тут почався звук
+// ---------- Sound level ----------
+// Every 10 ms a volume bar; a mark on top means a sound started here
 function drawLevel(db, trig) {
   const { width: w, height: h } = ui.spec;
   specCtx.drawImage(ui.spec, -1, 0);
@@ -1901,13 +1852,13 @@ function drawLevel(db, trig) {
   if (trig) { specCtx.fillStyle = recordingId ? '#ef4444' : '#f0b429'; specCtx.fillRect(w - 1, 0, 1, 8); }
 }
 
-// ---------- Бібліотека ----------
+// ---------- Library ----------
 async function importLibrary(files) {
   const ctx = new OfflineAudioContext(1, 1, Ear.SAMPLE_RATE);
   setStatus(tr('status.importing'));
   try {
     const lib = await Library.load(files, ctx, (i, n) => setStatus(tr('status.importingN', { i, n })));
-    // еталони — у памʼять, у список звуків (і сховище) — лише опис
+    // templates go to memory, only the description goes to the sound list (and storage)
     for (const s of lib.sounds) { tplCache.set(s.id, { up: s.up, down: s.down }); delete s.up; delete s.down; }
     sounds = sounds.filter(s => !s.lib).concat(normalizeSounds(lib.sounds));
     libPools = lib.pools;
@@ -1917,7 +1868,6 @@ async function importLibrary(files) {
     profiles = lib.profiles;
     try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
     renderProfiles();
-    renderPurchases();
     saveSounds();
     log(tr('log.libDone', { s: lib.sounds.length, i: lib.sounds.reduce((a, s) => a + s.items.length, 0) }));
     setStatus(tr(stream ? 'status.listening' : 'status.libDone'));
@@ -1929,8 +1879,8 @@ async function importLibrary(files) {
   }
 }
 
-// Бібліотека лежить поруч у папці library: підтягуємо її при кожному запуску (еталони живуть лише
-// в памʼяті). Працює через start.bat (localhost); з file:// браузер не дає читати файли — тоді кнопка.
+// The library sits next to the app in the library folder: it is loaded on every start (templates live only
+// in memory). Works via start.bat (localhost); with file:// the browser does not allow reading files, then the button is used.
 async function autoLoadLibrary() {
   try {
     const res = await fetch('library/groups.json', { cache: 'no-cache' });
@@ -1955,13 +1905,13 @@ function renderProfiles() {
   ui.profile.hidden = !profiles.length;
 }
 
-// ---------- Утиліти ----------
+// ---------- Utilities ----------
 function pct(x) { return Math.round(x * 100) + '%'; }
-// дрібні шанси з десятими, як у грі: 7.4%, 66%
+// small chances with a decimal, as in the game: 7.4%, 66%
 function pctFine(x) { const v = x * 100; return (v < 10 && v > 0 ? v.toFixed(1) : Math.round(v)) + '%'; }
 function fmtPrice(x) { return x.toLocaleString(I18n.locale); }
-// Назви поточною мовою: англійська — з даних гри, українська й російська — російські назви
-// (українських перекладів предметів у даних нема)
+// Names in the current language: English from the game data, Ukrainian and Russian use the Russian names
+// (the data has no Ukrainian item translations)
 function itemName(it) { return I18n.lang === 'en' && it.nameEn ? it.nameEn : it.name; }
 function soundName(s) { return I18n.lang === 'en' && s.nameEn ? s.nameEn : s.name; }
 function qName(q) { return tr('q.' + q.id); }
@@ -1976,45 +1926,11 @@ function log(s) {
   while (ui.log.children.length > 100) ui.log.lastChild.remove();
 }
 
-// ---------- Події ----------
+// ---------- Events ----------
 ui.start.onclick = start;
 ui.stop.onclick = stop;
 ui.rescan.onclick = resetScan;
 ui.done.onclick = () => freeze(tr('log.manualFreeze', { n: placedCargo().length }));
-
-// Покупки: клік по плитці в картці звуку — «випало оце»; нік; видалення й експорт
-ui.result.addEventListener('click', e => {
-  const tile = e.target.closest('.tile[data-id]');
-  if (!tile || ui.result.dataset.kind !== 'sound' || !cardCtx) return;
-  const s = soundById(cardCtx.soundId);
-  const it = s && s.items.find(x => String(x.id) === tile.dataset.id);
-  if (!it || !confirm(tr('buys.confirm', { item: itemName(it) }))) return;
-  recordPurchase({ soundId: cardCtx.soundId, size: cardCtx.size, label: cardCtx.label, price: cardCtx.label && cardCtx.label.price, itemId: it.id, key: cardCtx.key });
-  showResult(s, lastResult && lastResult.soundId === s.id ? lastResult.score : 1, null, cardCtx.size, cardCtx.label);
-});
-$('buys').addEventListener('click', e => {
-  const btn = e.target.closest('[data-del]');
-  if (!btn) return;
-  // помилковий запис прибираємо і зі спільної бази
-  purchases = purchases.filter(b => String(b.t) !== btn.dataset.del);
-  basePurchases = basePurchases.filter(b => String(b.t) !== btn.dataset.del);
-  savePurchases();
-  renderPurchases();
-  syncBase();
-});
-$('btnBuysClear').onclick = () => {
-  if (!purchases.length || !confirm(tr('buys.clearAsk'))) return;
-  purchases = [];
-  savePurchases();
-  renderPurchases();
-};
-$('btnBuysExport').onclick = () => {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(purchases, null, 1)], { type: 'application/json' }));
-  a.download = 'abi-kaluvan-purchases.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
 
 $('btnLib').onclick = () => ui.libDir.click();
 ui.libDir.onchange = e => {
@@ -2058,7 +1974,7 @@ ui.imgFile.onchange = async e => {
 };
 
 
-// Ручне призначення: клік ставить останній звук на вантаж, правий клік очищає
+// Manual assignment: a click puts the last sound on a cargo, a right click clears it
 function mapCargoAt(e) {
   const { minC, minR } = mapBounds();
   const p = canvasPos(ui.map, e);
@@ -2111,16 +2027,16 @@ $('btnClear').onclick = () => {
 };
 const syncLabels = () => { ui.sensVal.textContent = ui.sens.value + ' ' + tr('unit.db'); ui.thrVal.textContent = ui.thr.value + '%'; };
 ui.sens.oninput = ui.thr.oninput = syncLabels;
-// Мова інтерфейсу: при зміні перемальовуємо все, де є тексти
+// UI language: on change, everything with text is redrawn
 const langSelect = $('lang');
 langSelect.value = I18n.lang;
 langSelect.onchange = () => {
   I18n.setLang(langSelect.value);
   if (stream) showGameStatus(gameStatus);
-  syncLabels(); renderProfiles(); renderSounds(); updateStage(); drawMap(); renderUpdate(); renderPurchases();
+  syncLabels(); renderProfiles(); renderSounds(); updateStage(); drawMap(); renderUpdate();
 };
 
-// Новий реліз на GitHub: сама заміна файлів — у update.ps1 при запуску start.bat, тут лише підказка
+// A new release on GitHub: the files are replaced by update.ps1 when start.bat runs, here only a hint
 const REPO = 'neverh8me/abi-kaluvan';
 let latestRelease = null;
 async function checkUpdate() {
@@ -2131,7 +2047,7 @@ async function checkUpdate() {
     const num = s => s.split('.').map(Number);
     const newer = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
     if (v && newer(v, local)) { latestRelease = { v, url: rel.html_url }; renderUpdate(); }
-  } catch {} // офлайн або сайт відкрито не через start.bat — мовчимо
+  } catch {} // offline or the site is not opened via start.bat: stay quiet
 }
 function renderUpdate() {
   const a = $('update');
@@ -2147,7 +2063,6 @@ syncLabels();
 renderProfiles();
 renderSounds();
 try { OLD_PURCHASE_KEYS.forEach(k => localStorage.removeItem(k)); } catch {}
-renderPurchases();
 loadBase();
 autoLoadLibrary();
 updateStage();

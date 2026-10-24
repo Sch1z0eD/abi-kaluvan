@@ -1,5 +1,5 @@
-﻿# Апдейтер ABI Kaluvan: порівнює version.json з останнім релізом на GitHub і за згодою ставить новий поверх.
-# Повертає $true, якщо файли оновлено (тоді server.ps1 перезапускає себе вже з новими файлами).
+﻿# ABI Kaluvan updater: compares version.json with the latest GitHub release and, if confirmed, installs the new one on top.
+# Returns $true if the files were updated (then server.ps1 restarts itself with the new files).
 param([string]$Root = $PSScriptRoot)
 $repo = 'neverh8me/abi-kaluvan'
 
@@ -10,7 +10,7 @@ try {
   $remote = $rel.tag_name -replace '^v', ''
   if ([version]$remote -le [version]$local) { Write-Host "ABI Kaluvan v$local is up to date." -ForegroundColor DarkGray; return $false }
 } catch {
-  # немає інтернету чи GitHub недоступний — просто працюємо далі зі своєю версією
+  # no internet or GitHub is unavailable: just keep running the current version
   Write-Host 'Could not check for updates (offline?), starting the current version.' -ForegroundColor DarkYellow
   return $false
 }
@@ -30,7 +30,7 @@ try {
   Write-Host 'Downloading...'
   Invoke-WebRequest $zipUrl -OutFile $zip -UseBasicParsing -UserAgent 'abi-kaluvan-updater'
   Expand-Archive $zip -DestinationPath (Join-Path $tmp 'x') -Force
-  # в архіві файли лежать у підпапці — шукаємо ту, де є start.bat
+  # in the archive the files are in a subfolder: look for the one with start.bat
   $src = Get-ChildItem (Join-Path $tmp 'x') -Recurse -Filter 'start.bat' | Select-Object -First 1
   if (-not $src) { throw 'start.bat is missing in the archive' }
   Copy-Item (Join-Path $src.DirectoryName '*') -Destination $Root -Recurse -Force

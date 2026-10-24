@@ -1,23 +1,23 @@
-﻿# Синхронізація спільної бази покупок (library/purchases.json) при запуску, одразу після перевірки оновлень:
-#  - база з GitHub зливається з локальною (туди сайт пише свої покупки);
-#  - свої нові покупки йдуть на сервер спільної бази (Cloudflare Worker, код у worker/worker.js).
-#    Він перевіряє їх і сам дописує базу на GitHub; токен GitHub є лише в нього, тут нічого секретного.
+﻿# Sync of the shared purchase base (library/purchases.json) on launch, right after the update check:
+#  - the GitHub base is merged with the local one (the site writes your purchases locally);
+#  - your new purchases go to the shared-base server (a Cloudflare Worker, code in worker/worker.js).
+#    It validates them and appends them to the base on GitHub; only it has the GitHub token, nothing secret here.
 param([string]$Root = $PSScriptRoot)
 
 $BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'
-$WORKER      = 'https://abi-kaluvan.kaluvan-tools.workers.dev/submit'   # сервер спільної бази (worker/worker.js)
-$BATCH       = 25   # стільки покупок в одному запиті (Worker більше не приймає)
+$WORKER      = 'https://abi-kaluvan.kaluvan-tools.workers.dev/submit'   # shared-base server (worker/worker.js)
+$BATCH       = 25   # purchases per request (the Worker accepts no more)
 $UA          = 'abi-kaluvan-sync'
 
 $baseFile = Join-Path $Root 'library\purchases.json'
-$mineFile = Join-Path $Root 'purchases.mine.json'   # свої покупки (пише сайт, не в git)
+$mineFile = Join-Path $Root 'purchases.mine.json'   # own purchases (written by the site, not in git)
 $sentFile = Join-Path $Root '.purchases-sent.json'
-$isClone = Test-Path (Join-Path $Root '.git')        # git-клон (автор): файл бази в git не чіпаємо, його веде Worker
+$isClone = Test-Path (Join-Path $Root '.git')        # a git clone (the author): the base file in git is left alone, the Worker maintains it
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Key($e) { "$($e.t)|$($e.itemId)|$($e.price)" }
 
-# Текст відповіді завжди як UTF-8 (Windows PowerShell інакше вгадує кодування або віддає байти)
+# Response text always as UTF-8 (Windows PowerShell otherwise guesses the encoding or returns bytes)
 function Fetch([string]$url, [int]$timeout) {
   $r = Invoke-WebRequest $url -UseBasicParsing -TimeoutSec $timeout -UserAgent $UA
   return [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
@@ -30,7 +30,7 @@ function ReadList([string]$json) {
   return @()
 }
 
-# Дозволені пари «звук → предмет» — так само, як їх будує library.js
+# Allowed "sound → item" pairs, built the same way as in library.js
 function ValidPairs {
   $g = Get-Content (Join-Path $Root 'library\groups.json') -Raw -Encoding UTF8 | ConvertFrom-Json
   $m = Get-Content (Join-Path $Root 'library\merchant.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -38,7 +38,7 @@ function ValidPairs {
   $script:names = @{}; $script:quals = @{}; $script:poolPrices = @{}
   $rarity = @{ 6 = 'red'; 5 = 'gold'; 4 = 'purple'; 3 = 'blue'; 2 = 'green'; 1 = 'white' }
   foreach ($it in $m.items) { $script:names["$($it.id)"] = [string]$it.en; $script:quals["$($it.id)"] = $rarity[[int]$it.rarity] }
-  # ціни пулів торговця, у яких трапляється предмет: справжня покупка коштує саме стільки (± знижка/націнка)
+  # merchant pool prices where the item occurs: a real purchase costs exactly that (± discount/markup)
   foreach ($pl in $m.pools) { foreach ($pi in $pl.items) { $k = "$($pi[0])"; if (-not $script:poolPrices[$k]) { $script:poolPrices[$k] = @() }; $script:poolPrices[$k] += [double]$pl.price } }
   foreach ($grp in $g.groups) {
     foreach ($it in $grp.items) { if ($it.id -and -not $script:names.ContainsKey("$($it.id)")) { $script:names["$($it.id)"] = [string]$it.en } }
@@ -51,8 +51,8 @@ function ValidPairs {
   return $pairs
 }
 
-# Лише відомі поля з правдоподібними значеннями; інше (сміття, спам) відкидаємо
-# написи вантажів, як їх записує сайт (MYSTERY_TIERS у index.html і LABELS у ocr.js)
+# Only known fields with plausible values; anything else (junk, spam) is dropped
+# cargo labels as the site writes them (MYSTERY_TIERS in index.html and LABELS in ocr.js)
 $LABELS = '', 'Mystery Cargo', 'Uncommon Mystery Cargo', 'Rare Mystery Cargo', 'Military Items', 'Medical Supplies',
   'Computer Parts', 'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials',
   'Electronics', 'Flammables', 'Tools', 'Paper'
@@ -60,9 +60,9 @@ function Clean($e, $pairs) {
   if (-not $e) { return $null }
   try { $t = [double]$e.t; $price = [double]$e.price } catch { return $null }
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-  if ($t -lt 1735689600000 -or $t -gt $now + 86400000) { return $null }   # з 2025 року й не з майбутнього
+  if ($t -lt 1735689600000 -or $t -gt $now + 86400000) { return $null }   # from 2025 on and not from the future
   if (-not $e.soundId -or $null -eq $e.itemId -or -not $pairs.ContainsKey("$($e.soundId)|$($e.itemId)")) { return $null }
-  # ціна має збігатися з ціною якогось пулу, де є цей предмет (як на сайті: ±28%, з націнкою 10%)
+  # the price must match a pool that holds this item (as on the site: ±28%, with a 10% markup)
   $plausible = $false
   foreach ($pp in @($script:poolPrices["$($e.itemId)"])) {
     if ($pp -gt 0 -and $price -gt 0 -and [Math]::Min([Math]::Abs([Math]::Log($price / $pp)), [Math]::Abs([Math]::Log($price / ($pp * 1.1)))) -le 0.25) { $plausible = $true; break }
@@ -70,9 +70,9 @@ function Clean($e, $pairs) {
   if (-not $plausible) { return $null }
   $size = [string]$e.size
   if ($size -and $size -notmatch '^[1-9]x[1-9]$') { return $null }
-  $q = [string]$script:quals["$($e.itemId)"]   # якість — з довідника, не з запису
-  # Жодного вільного тексту в спільній базі (щоб туди ніяк не потрапив нік чи інше з екрана):
-  # назва предмета — з довідника за id, напис вантажу — лише з відомого списку
+  $q = [string]$script:quals["$($e.itemId)"]   # quality from the catalog, not from the entry
+  # No free text in the shared base (so that a nickname or anything else from the screen can never get in):
+  # item name from the catalog by id, cargo label only from a known list
   $label = [string]$e.label
   if ($LABELS -notcontains $label) { $label = '' }
   return [ordered]@{ t = [long]$t; soundId = [string]$e.soundId; size = $size; label = $label; price = [long]$price; itemId = [long]$e.itemId; item = $script:names["$($e.itemId)"]; q = $q }
@@ -92,12 +92,12 @@ try {
   $online = $true
   try { $remote = ReadList (Fetch $BASE_REMOTE 6) }
   catch {
-    # 404 — бази на GitHub ще нема (інтернет є); інше — офлайн
+    # 404: there is no base on GitHub yet (online); anything else: offline
     $resp = $_.Exception.Response
     if (-not ($resp -and [int]$resp.StatusCode -eq 404)) { $online = $false }
   }
 
-  # у спільну базу — лише очищені записи (свої теж: там може бути розпізнаний з екрана текст)
+  # only cleaned entries go into the shared base (own ones too: they may contain text read from the screen)
   $cleanAll = { param($list) @($list | ForEach-Object { Clean $_ $pairs } | Where-Object { $_ } | ForEach-Object { [pscustomobject]$_ }) }
   $merged = @(Merge @(@(& $cleanAll $remote), @(& $cleanAll $local), @(& $cleanAll $mine)))
   $remoteKeys = @{}; foreach ($e in $remote) { $remoteKeys[(Key $e)] = $true }
@@ -105,7 +105,7 @@ try {
   $added = @($merged | Where-Object { -not $localKeys.ContainsKey((Key $_)) }).Count
 
   if ($WORKER -and $online) {
-    # свої нові покупки — на Worker; що вже відправили або вже є на GitHub, вдруге не шлемо
+    # own new purchases go to the Worker; whatever was already sent or is already on GitHub is not sent again
     $sent = @{}
     if (Test-Path $sentFile) { foreach ($k in (Get-Content $sentFile -Raw | ConvertFrom-Json)) { $sent[$k] = $true } }
     foreach ($k in $remoteKeys.Keys) { $sent[$k] = $true }
@@ -119,7 +119,7 @@ try {
         Invoke-WebRequest $WORKER -Method Post -Body $body -ContentType 'application/json' -UseBasicParsing -TimeoutSec 15 -UserAgent $UA | Out-Null
         foreach ($e in $chunk) { $sent[(Key $e)] = $true }
         $done += $chunk.Count
-      } catch { break } # ліміт запитів чи сервер недоступний — решту наступного разу
+      } catch { break } # rate limit or the server is unavailable: the rest goes next time
     }
     [IO.File]::WriteAllText($sentFile, (ConvertTo-Json -InputObject @($sent.Keys) -Compress), (New-Object Text.UTF8Encoding($false)))
     if ($done) { Write-Host "Sent $done of your purchases to the shared database." -ForegroundColor Green }

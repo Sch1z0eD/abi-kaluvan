@@ -1,6 +1,6 @@
 'use strict';
-// Читання написів з картинки гри: назви вантажів у сітці торговця.
-// Tesseract (відкритий OCR) лежить локально в lib/tesseract, інтернет не потрібен.
+// Reading text from the game picture: cargo labels in the merchant grid, the price tooltip, the feed and the balance.
+// Tesseract (open-source OCR) is bundled in lib/tesseract, no internet needed.
 const Ocr = (() => {
   const LABELS = [
     { key: 'raremysterycargo', mystery: 'rare' },
@@ -20,8 +20,8 @@ const Ocr = (() => {
     { key: 'paper', category: 'Paper', name: 'Paper' },
   ];
 
-  // Два розпізнавачі в окремих потоках: написи вантажів (їх багато) і рамка з ціною (вона потрібна
-  // одразу, поки курсор на вантажі, тож не стоїть у черзі за написами)
+  // Separate readers in their own threads: cargo labels (there are many of them) and the price tooltip
+  // (it is needed right away while the cursor is on the cargo, so it does not wait behind the labels)
   const lanes = {};
 
   function lane(name) {
@@ -37,16 +37,16 @@ const Ocr = (() => {
     return lanes[name];
   }
 
-  // Запускаємо всі розпізнавачі одразу (після «Почати ловлю»): інакше перша ціна чи перші написи
-  // чекали б ще й на запуск (~0.4 с). Написи читають два розпізнавачі паралельно.
+  // Start all readers at once (after "Start catching"): otherwise the first price or the first labels
+  // would also wait for the start-up (~0.4 s). Labels are read by two readers in parallel.
   function start() { return Promise.all(['label', 'label2', 'tip'].map(n => lane(n).worker)); }
 
   function read(canvas, name = 'label') {
     return readData(canvas, name).then(data => data.text);
   }
 
-  // Повний результат: текст і рядки зі словами та прямокутниками (bbox у пікселях полотна).
-  // У межах одного розпізнавача — по одному, Tesseract усе одно однопотоковий.
+  // Full result: text and lines with words and boxes (bbox in canvas pixels).
+  // One job at a time per reader: Tesseract is single-threaded anyway.
   function readData(canvas, name = 'tip') {
     const l = lane(name);
     const job = l.queue.then(async () => {
@@ -58,9 +58,9 @@ const Ocr = (() => {
     return job;
   }
 
-  // Рамка з ціною: білий текст на майже чорному. Збільшуємо вдвічі й інвертуємо.
-  // Текст гри однаковий у клітинках, а клітинка — від роздільності (1280×1024 ~40 px, 2K ~85 px).
-  // Збільшуємо так, щоб для Tesseract текст був однієї висоти: при 64 px (1080p) — удвічі.
+  // Price tooltip: white text on near black. Scale it up and invert.
+  // The game text has the same size in cells, and the cell size depends on resolution (1280×1024 ~40 px, 2K ~85 px).
+  // Scale so that the text has the same height for Tesseract: at 64 px (1080p) — 2x.
   const TIP_SCALE = 2;
   const tipScale = P => (P ? Math.min(3, Math.max(1.25, 128 / P)) : TIP_SCALE);
   function tipCanvas(src, x, y, w, h, P) {
@@ -74,9 +74,9 @@ const Ocr = (() => {
     return c;
   }
 
-  // Сама рамка в шматку кадру: найбільша суцільна темна пляма, де є світлий текст. Сірі вантажі
-  // з написами довкола в неї не входять, тож розпізнавач не змішує ціну з чужими написами.
-  // Повертає { x, y, w, h } у координатах src або null.
+  // The tooltip itself within a frame patch: the largest solid dark blob with light text. Grey cargo
+  // with labels around it is not part of it, so the reader does not mix the price with other labels.
+  // Returns { x, y, w, h } in src coordinates or null.
   const TIP_BLOCK = 4;
   function findTipBox(src, x, y, w, h, P) {
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
@@ -89,8 +89,8 @@ const Ocr = (() => {
     for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
     const sorted = Array.from(g).sort((a, b) => a - b);
     const median = sorted[sorted.length >> 1];
-    const dark = Math.max(8, Math.min(30, median * 0.5)); // фон рамки темніший за сірі вантажі
-    // блоки 4×4: «рамкові» — переважно темні, майже без сірого (сірий — це вантажі)
+    const dark = Math.max(8, Math.min(30, median * 0.5)); // the tooltip background is darker than grey cargo
+    // 4×4 blocks: "tooltip" ones are mostly dark, with almost no grey (grey is cargo)
     const bw = Math.floor(w / TIP_BLOCK), bh = Math.floor(h / TIP_BLOCK);
     const tipish = new Uint8Array(bw * bh), text = new Uint8Array(bw * bh);
     for (let by = 0; by < bh; by++) {
@@ -107,7 +107,7 @@ const Ocr = (() => {
         text[by * bw + bx] = nb > 0 ? 1 : 0;
       }
     }
-    // найбільша звʼязна пляма з текстом
+    // the largest connected blob with text
     const seen = new Uint8Array(bw * bh);
     let best = null;
     for (let i = 0; i < tipish.length; i++) {
@@ -136,10 +136,10 @@ const Ocr = (() => {
     return { x: x + bx, y: y + by, w: bw2, h: bh2 };
   }
 
-  // Зі знижкою в рамці дві ціни: «216,000 270,000» (стара закреслена). Розряди розділені тими ж
-  // пробілами чи комами, тож регулярний вираз склеює їх в одне число. Беремо групи по черзі, доки
-  // кожна — рівно 3 цифри з тим самим розділювачем і ціна не довша за 7 цифр (дорожче 9 999 999
-  // вантажів не буває): це й є поточна ціна.
+  // A discounted tooltip shows two prices: "216,000 270,000" (the old one crossed out). Digit groups are split by
+  // the same spaces or commas, so the regex glues them into one number. Take groups one by one while
+  // each has exactly 3 digits with the same separator and the price is at most 7 digits (no cargo costs more
+  // than 9,999,999): that is the current price.
   function firstPrice(text) {
     const parts = [...text.matchAll(/(\d+)([ ,.]?)/g)];
     let digits = parts[0][1];
@@ -152,8 +152,8 @@ const Ocr = (() => {
     return +digits;
   }
 
-  // З тексту рамки: назва вантажу (з прямокутником її рядка) і ціна.
-  // Ціна — число з групами розрядів: «110,000», «470 000».
+  // From the tooltip text: the cargo label (with the box of its line) and the price.
+  // The price is a number with digit groups: "110,000", "470 000".
   function parseTip(data, k = TIP_SCALE) {
     const lines = (data.lines || []).map(l => ({ text: l.text.trim(), bbox: l.bbox, words: l.words }));
     let price = 0, priceAt = -1;
@@ -163,14 +163,14 @@ const Ocr = (() => {
       if (m) { price = firstPrice(m[1]); priceAt = i; }
     });
     if (!price || price < 1000) return null;
-    // Назва в рамці — рядок одразу над ціною. Вище можуть потрапити написи сусідніх вантажів у сітці,
-    // тож ідемо від ціни вгору й беремо лише найближчий рядок.
+    // The label in the tooltip is the line right above the price. Labels of neighbouring cargo in the grid
+    // may be caught higher up, so we go up from the price and take only the nearest line.
     const priceBox = lines[priceAt].bbox;
     let label = null, labelBox = null;
     const above = lines[priceAt - 1];
     if (above && priceBox.y0 - above.bbox.y1 < (priceBox.y1 - priceBox.y0) * 2.5) {
-      // Tesseract може злити назву з написом сусідньої комірки на тій самій висоті: беремо лише
-      // слова, що стоять над рядком ціни (назва в рамці починається трохи лівіше за ціну)
+      // Tesseract may merge the label with a neighbouring cell's label at the same height: take only
+      // the words above the price line (the tooltip label starts slightly left of the price)
       const lineH = priceBox.y1 - priceBox.y0;
       const words = (above.words || []).filter(wd => wd.bbox.x0 >= priceBox.x0 - lineH * 2.5);
       const text = words.length ? words.map(wd => wd.text).join(' ') : above.text;
@@ -183,10 +183,10 @@ const Ocr = (() => {
     return { price, label, labelBox: labelBox && scale(labelBox), priceBox: scale(priceBox) };
   }
 
-  // Напис вантажу у верхній частині комірки: вирізаємо, збільшуємо й інвертуємо (темний текст на
-  // світлому Tesseract читає краще). src — кадр, x/y/w/h — прямокутник вантажу в ньому.
+  // Cargo label at the top of a cell: crop, scale up and invert (Tesseract reads dark text on a
+  // light background better). src — the frame, x/y/w/h — the cargo rectangle in it.
   function labelCanvas(src, x, y, w, h, P) {
-    const lh = Math.min(h, P * 0.75), k = Math.min(4, Math.max(2, 192 / P)); // при 64 px — утричі
+    const lh = Math.min(h, P * 0.75), k = Math.min(4, Math.max(2, 192 / P)); // 3x at 64 px
     const c = document.createElement('canvas');
     c.width = Math.round((w - 4) * k); c.height = Math.round((lh - 4) * k);
     const ctx = c.getContext('2d');
@@ -195,8 +195,8 @@ const Ocr = (() => {
     return c;
   }
 
-  // Найближча відома назва. Напис може бути обрізаний («Uncommo n Mus tory» у вузькій комірці),
-  // тож порівнюємо з початком назви тієї ж довжини. Повертає опис назви або null.
+  // The closest known label. A label may be cut off ("Uncommo n Mus tory" in a narrow cell),
+  // so it is compared with the start of a name of the same length. Returns the label description or null.
   function parseLabel(text) {
     const s = text.toLowerCase().replace(/[^a-z]/g, '');
     if (s.length < 4) return null;
@@ -204,17 +204,17 @@ const Ocr = (() => {
     for (const l of LABELS) {
       const target = l.key.slice(0, Math.min(l.key.length, s.length + 2));
       const d = distance(s.slice(0, target.length + 2), target) / target.length;
-      // за рівного збігу беремо довшу назву: «Rare Mystery Cargo», а не «Mystery Cargo»
+      // on an equal match take the longer name: "Rare Mystery Cargo", not "Mystery Cargo"
       if (d < bestScore - 0.02 || (Math.abs(d - bestScore) <= 0.02 && best && l.key.length > best.key.length)) { bestScore = d; best = l; }
     }
     return bestScore <= 0.4 ? best : null;
   }
 
-  // Рядок стрічки над сіткою: «neverh8me spent 200,000 Koen on a mystery cargo and obtained [Studio Monitor]».
-  // Назва предмета може бути обрізана краєм панелі. Повертає { nick, price, item } або null.
+  // Feed line above the grid: "neverh8me spent 200,000 Koen on a mystery cargo and obtained [Studio Monitor]".
+  // The item name may be cut off by the panel edge. Returns { nick, price, item } or null.
   function parseFeed(text) {
     const s = text.replace(/\s+/g, ' ');
-    // «obtained» на малій роздільності читається як «obloned», «obtomed» — досить «ob…» або дужки
+    // at low resolution "obtained" is read as "obloned", "obtomed" — "ob…" or a bracket is enough
     const m = s.match(/(\S+)\s+spent\s+([\d][\d ,.oO]*\d)\s*K\w*\s+on\b.*?(?:\bob\w*|(?=[\[({]))\s*[\[({|]?\s*([^\]\)}|]+)/i);
     if (!m) return null;
     const price = +m[2].replace(/[oO]/g, '0').replace(/\D/g, '');
@@ -223,14 +223,14 @@ const Ocr = (() => {
     return { nick: m[1], price, item };
   }
 
-  // Баланс під сіткою: «Owned: 624,605» (перед числом — значок Koen, Tesseract читає його як сміття)
+  // Balance below the grid: "Owned: 624,605" (the Koen icon before the number is read as junk)
   function parseBalance(text) {
     const m = text.replace(/[oO](?=[\d,.]*\d)/g, '0').match(/wned\D{0,12}(\d{1,3}(?:[ ,.]\d{3})+|\d{1,9})/i);
     return m ? +m[1].replace(/\D/g, '') : 0;
   }
 
-  // Найближча назва зі списку { name } (назва з рядка може бути обрізаною — тоді порівнюємо з початком).
-  // Повертає елемент списку або null.
+  // The closest name from a list of { name } (a name from the line may be cut off — then compare with the start).
+  // Returns the list element or null.
   function matchName(text, list) {
     const norm = x => x.toLowerCase().replace(/[^a-z0-9]/g, '');
     const s = norm(text);
@@ -239,7 +239,7 @@ const Ocr = (() => {
     for (const el of list) {
       const n = norm(el.name);
       if (!n) continue;
-      // обрізана назва: лише початок; повна — уся, щоб «Gold» не збігся з «Gold Bar»
+      // cut-off name: only the start; full name — the whole of it, so that "Gold" does not match "Gold Bar"
       const target = s.length < n.length ? n.slice(0, s.length) : n;
       const d = distance(s, target) / Math.max(s.length, target.length) + (s.length < n.length ? 0.01 : 0);
       if (d < bestScore) { bestScore = d; best = el; }

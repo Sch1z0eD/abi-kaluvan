@@ -1,7 +1,7 @@
-// Локальний сервер ABI Kaluvan: роздає сайт і передає йому звук лише процесу гри.
-// Звук береться штатним механизмом Windows (process loopback, як в OBS і Discord): гра не
-// відкривається і в неї ніхто не лізе, потрібен лише номер процесу зі звичайного списку процесів.
-// Компілюється з server.ps1 через Add-Type, тому тут C# 5 (без новіших можливостей мови).
+// ABI Kaluvan local server: serves the site and streams to it the sound of the game process only.
+// The sound is captured with the standard Windows mechanism (process loopback, as in OBS and Discord): the game
+// is not opened and nobody touches it, only the process number from the regular process list is needed.
+// Compiled from server.ps1 via Add-Type, so this is C# 5 (no newer language features).
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -52,7 +52,7 @@ namespace AbiEar
         void ActivateCompleted(IActivateAudioInterfaceAsyncOperation operation);
     }
 
-    // Windows вимагає «агільний» обробник: його можна викликати з будь-якого потоку
+    // Windows requires an "agile" handler: it may be called from any thread
     [ComImport, Guid("94ea2b94-e9cc-49e0-c0ff-ee64ca8f5b90"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     public interface IAgileObject { }
 
@@ -79,7 +79,7 @@ namespace AbiEar
         static extern int ActivateAudioInterfaceAsync([MarshalAs(UnmanagedType.LPWStr)] string path, ref Guid riid,
             IntPtr activationParams, IActivateAudioInterfaceCompletionHandler handler, out IActivateAudioInterfaceAsyncOperation operation);
 
-        // exe — назва без .exe; «pid:1234» — конкретний процес (для перевірки без гри)
+        // exe — name without .exe; "pid:1234" — a specific process (for testing without the game)
         public static int FindProcess(string exe)
         {
             int pid;
@@ -90,7 +90,7 @@ namespace AbiEar
 
         static IAudioClient Activate(int pid)
         {
-            // AUDIOCLIENT_ACTIVATION_PARAMS { тип, PID, режим } у PROPVARIANT типу VT_BLOB
+            // AUDIOCLIENT_ACTIVATION_PARAMS { type, PID, mode } in a PROPVARIANT of type VT_BLOB
             IntPtr prms = Marshal.AllocHGlobal(12), pv = Marshal.AllocHGlobal(24);
             try
             {
@@ -106,24 +106,24 @@ namespace AbiEar
                 var done = new ActivationDone();
                 IActivateAudioInterfaceAsyncOperation op;
                 int hr = ActivateAudioInterfaceAsync(VIRTUAL_DEVICE, ref iid, pv, done, out op);
-                if (hr != 0) throw new Exception("Windows відмовила в захопленні звуку (код 0x" + hr.ToString("X8") + ")");
-                if (!done.Done.WaitOne(5000)) throw new Exception("Windows не відповіла на запит захоплення звуку");
+                if (hr != 0) throw new Exception("Windows refused to capture the sound (code 0x" + hr.ToString("X8") + ")");
+                if (!done.Done.WaitOne(5000)) throw new Exception("Windows did not answer the sound capture request");
                 int result; object iface;
                 Marshal.ThrowExceptionForHR(op.GetActivateResult(out result, out iface));
-                if (result != 0) throw new Exception("Windows відмовила в захопленні звуку (код 0x" + result.ToString("X8") + ")");
+                if (result != 0) throw new Exception("Windows refused to capture the sound (code 0x" + result.ToString("X8") + ")");
                 return (IAudioClient)iface;
             }
             finally { Marshal.FreeHGlobal(prms); Marshal.FreeHGlobal(pv); }
         }
 
-        // Захоплює звук процесу, поки той живий і stop() не повернув true. onAudio — моно float 48 кГц.
+        // Captures the process sound while it is alive and stop() has not returned true. onAudio — mono float 48 kHz.
         public static void Run(int pid, Action<float[]> onAudio, Func<bool> stop)
         {
             var client = Activate(pid);
             IntPtr fmt = Marshal.AllocHGlobal(18);
             try
             {
-                // WAVEFORMATEX: float32, 48 кГц, стерео
+                // WAVEFORMATEX: float32, 48 kHz, stereo
                 Marshal.WriteInt16(fmt, 0, 3);
                 Marshal.WriteInt16(fmt, 2, 2);
                 Marshal.WriteInt32(fmt, 4, SAMPLE_RATE);
@@ -180,16 +180,16 @@ namespace AbiEar
             }
         }
 
-        // Лише перевірка списку процесів: сам процес гри не відкриваємо (античит цього не дає, і не треба)
+        // Only a check of the process list: the game process itself is not opened (the anti-cheat would not allow it, and it is not needed)
         static bool Alive(int pid)
         {
             try { Process.GetProcessById(pid).Dispose(); return true; } catch { return false; }
         }
     }
 
-    // ---------- знімок екрана ----------
-    // Знімаємо основний монітор звичайним GDI (як скріншот) і віддаємо JPEG. Працює в режимі гри
-    // «вікно без рамки»; у повноекранному режимі Windows віддає чорний кадр — про це кажемо сторінці.
+    // ---------- screen capture ----------
+    // The game window is captured with plain GDI (like a screenshot) and sent as JPEG. Works with the game in
+    // "borderless window" mode; in exclusive fullscreen Windows returns a black frame, and the page is told so.
     public static class Screen
     {
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
@@ -203,7 +203,7 @@ namespace AbiEar
         [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }
 
-        // Найбільше видиме вікно процесу гри — зі звичайного списку вікон Windows, сам процес не відкриваємо
+        // The largest visible window of the game process, from the regular Windows window list; the process itself is not opened
         public static IntPtr FindWindow(int pid)
         {
             IntPtr best = IntPtr.Zero;
@@ -222,7 +222,7 @@ namespace AbiEar
             return best;
         }
 
-        // Робоча область вікна (без рамки й заголовка) у координатах екрана
+        // The window client area (without border and title) in screen coordinates
         public static System.Drawing.Rectangle ClientArea(IntPtr hwnd)
         {
             Rect r;
@@ -240,7 +240,7 @@ namespace AbiEar
             return null;
         }
 
-        // Знімок прямокутника екрана (робочої області вікна гри)
+        // Capture of a screen rectangle (the client area of the game window)
         public static System.Drawing.Bitmap Capture(System.Drawing.Rectangle area)
         {
             var bmp = new System.Drawing.Bitmap(area.Width, area.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
@@ -249,7 +249,7 @@ namespace AbiEar
             return bmp;
         }
 
-        // Чи кадр повністю чорний (повноекранний режим гри): 81 точка сіткою
+        // Whether the frame is completely black (game in exclusive fullscreen): 81 points in a grid
         public static bool IsBlack(System.Drawing.Bitmap bmp)
         {
             for (int i = 1; i < 10; i++)
@@ -274,13 +274,13 @@ namespace AbiEar
 
     }
 
-    // ---------- сервер ----------
+    // ---------- server ----------
     public static class Server
     {
         static readonly List<WebSocket> clients = new List<WebSocket>();
         static readonly List<WebSocket> screenClients = new List<WebSocket>();
-        const int SCREEN_FRAME_MS = 33;  // до 30 кадрів на секунду
-        const int BLACK_CHECK_EVERY = 15; // перевірка на чорний кадр — раз на стільки кадрів
+        const int SCREEN_FRAME_MS = 33;  // up to 30 frames per second
+        const int BLACK_CHECK_EVERY = 15; // check for a black frame once per this many frames
         static string status = "{\"type\":\"status\",\"state\":\"start\"}";
         static string root;
 
@@ -290,11 +290,11 @@ namespace AbiEar
             { ".svg", "image/svg+xml" }, { ".ico", "image/x-icon" }, { ".wav", "audio/wav" },
         };
 
-        // Блокує потік: обслуговує запити, поки вікно не закриють
+        // Blocks the thread: serves requests until the window is closed
         public static void Run(string siteRoot, int port, string exe)
         {
             root = Path.GetFullPath(siteRoot);
-            Screen.SetProcessDPIAware(); // інакше при масштабі Windows 125% знімається лише частина екрана
+            Screen.SetProcessDPIAware(); // otherwise only part of the screen is captured at 125% Windows scaling
             var listener = new HttpListener();
             listener.Prefixes.Add("http://localhost:" + port + "/");
             listener.Start();
@@ -340,9 +340,9 @@ namespace AbiEar
             res.Close();
         }
 
-        // Свої покупки: сторінка надсилає їх список, ми записуємо його в purchases.mine.json (не в git),
-        // а sync.ps1 при запуску шле звідти нові покупки на Worker. Свій заголовок обовʼязковий:
-        // з чужого сайту браузер такий запит без дозволу CORS не надішле, тож файл не перезапише ніхто сторонній.
+        // Own purchases: the page sends their list, we write it to purchases.mine.json (not in git),
+        // and sync.ps1 sends the new ones from there to the Worker on launch. The custom header is required:
+        // a browser will not send such a request from another site without CORS permission, so no third party can overwrite the file.
         const int PURCHASES_MAX = 8 * 1024 * 1024;
         static void SavePurchases(HttpListenerContext ctx)
         {
@@ -382,7 +382,7 @@ namespace AbiEar
             try { ws.Dispose(); } catch { }
         }
 
-        // сторінка нічого не шле; читаємо, лише щоб помітити, що її закрили
+        // the page sends nothing; we read only to notice that it was closed
         static void WaitClosed(WebSocket ws)
         {
             var buf = new ArraySegment<byte>(new byte[256]);
@@ -406,9 +406,9 @@ namespace AbiEar
             }
         }
 
-        // Кадри екрана — лише поки сторінка їх чекає. Знімок і стиснення в JPEG ідуть паралельно
-        // у двох потоках (правої половини вікна — ~8 і ~3 мс): до 30 кадрів на секунду.
-        static System.Drawing.Bitmap pending;    // знятий, але ще не стиснутий кадр
+        // Screen frames — only while the page waits for them. Capture and JPEG encoding run in parallel
+        // in two threads (for the right half of the window — ~8 and ~3 ms): up to 30 frames per second.
+        static System.Drawing.Bitmap pending;    // a captured frame that is not encoded yet
         static string screenState = "start";     // game | nogame | minimized
 
         static void SetScreenState(string state)
@@ -421,12 +421,12 @@ namespace AbiEar
             foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
         }
 
-        // crop: кадр — уже права частина вікна (торговець завжди справа), сторінці не треба різати ще раз
+        // crop: the frame is already the right part of the window (the merchant is always on the right), the page does not crop again
         const double MERCHANT_SIDE = 0.5;
         static string ScreenStateJson() { return "{\"type\":\"screen\",\"state\":\"" + screenState + "\",\"crop\":" + MERCHANT_SIDE.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}"; }
         static readonly AutoResetEvent hasPending = new AutoResetEvent(false);
 
-        // Знімаємо лише робочу область вікна гри: інші монітори й програми в кадр не потрапляють
+        // Capture only the client area of the game window: other monitors and apps never get into the frame
         static void ScreenLoop(string exe)
         {
             var enc = new Thread(EncodeLoop);
@@ -452,10 +452,10 @@ namespace AbiEar
                 if (screenState != "game") { Thread.Sleep(500); continue; }
                 try
                 {
-                    // лише права частина вікна: там торговець; ліву половину знімати й стискати даремно
+                    // only the right part of the window: the merchant is there; capturing and encoding the left half is wasted
                     int cut = (int)Math.Round(area.Width * MERCHANT_SIDE);
                     var bmp = Screen.Capture(new System.Drawing.Rectangle(area.X + cut, area.Y, area.Width - cut, area.Height));
-                    // якщо попередній ще не стиснули — замінюємо його свіжим, черга не росте
+                    // if the previous one is not encoded yet, replace it with the fresh one, so the queue does not grow
                     var old = Interlocked.Exchange(ref pending, bmp);
                     if (old != null) old.Dispose();
                     hasPending.Set();

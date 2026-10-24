@@ -1,6 +1,6 @@
 'use strict';
-// Тексти інтерфейсу трьома мовами. tr('ключ', { змінні }) — текст поточною мовою.
-// У HTML: data-i18n (текст), data-i18n-html (з розміткою), data-i18n-ph (placeholder), data-i18n-title (підказка).
+// UI texts in three languages. tr('key', { vars }) — the text in the current language.
+// In HTML: data-i18n (text), data-i18n-html (with markup), data-i18n-ph (placeholder), data-i18n-title (tooltip).
 const I18n = (() => {
   const DICT = {
     uk: {
@@ -12,12 +12,6 @@ const I18n = (() => {
       'map.hint': 'Наведи мишку на вантаж на схемі, щоб побачити подробиці. Клік призначає йому останній звук, правий клік очищає.',
       'h.level': 'Рівень звуку', 'lbl.sens': 'Чутливість', 'lbl.thr': 'Поріг збігу', 'lbl.beep': 'Сигнал', 'unit.db': 'дБ',
       'h.log': 'Журнал', 'h.sounds': 'Звуки', 'btn.lib': 'Імпорт бібліотеки',
-      'h.buys': 'Покупки', 
-      'buys.clear': 'Очистити', 'buys.del': 'Видалити запис', 'buys.noSound': 'без звуку', 'buys.summary': '· база {base} · твої {mine} · червоних {red}',
-      'buys.empty': 'Ще нічого не записано. Наведи на вантаж (щоб сайт знав ціну), смикни й купи — покупка запишеться сама з рядка «… obtained [предмет]» над сіткою. Або клікни плитку предмета в картці результату.',
-      'buys.confirm': 'Записати покупку: випало «{item}»?', 'buys.clearAsk': 'Видалити всі записані покупки?',
-      'log.bought': 'Записав покупку: {sound}, {price} → {item}',
-      'card.mine': 'Покупок з цим звуком у базі: {n} — шанси вже їх враховують', 'card.recordHint': 'Купив? Клікни предмет, що випав, — запишу (або запишеться сам із рядка гри).',
       'tip.profile': 'Карта і режим: від них залежать шанси', 'opt.allMaps': 'Усі карти (середнє)',
       'lbl.blue': 'Сині', 'tip.blue': 'У таблицях abibuilder сині предмети в торговця є, але в грі їх не трапляється',
       'ph.newName': 'Назва звуку, напр. «Скло»', 'btn.add': 'Додати',
@@ -29,7 +23,7 @@ const I18n = (() => {
       'help.4': '<b>Наведи.</b> Наведи курсор на вантаж — сайт прочитає назву й ціну з рамки й покаже шанс краснухи ще до смикання.',
       'help.5': '<b>Перетягни.</b> Смикни вантаж: звук уточнить, що всередині. На схемі зʼявляться можливі предмети з відсотками.',
       'help.6': 'Краснухи бувають лише в Mystery Cargo (звичайний, Uncommon, Rare). Вантажі з назвою категорії (Tools, Paper…) на схемі притушені.',
-      'help.7': '<b>Купив?</b> Покупка запишеться сама з рядка гри «… obtained [предмет]», якщо перед цим наводив на вантаж і смикав його. Схема після покупки не змінюється — натисни «Шукати заново». Що більше покупок, то точніші шанси для спільних звуків.',
+      'help.7': '<b>Купив?</b> Схема лишається як була. Натисни <b>Шукати заново</b> і прогорни список ще раз.',
       'help.note': 'Усе зберігається в браузері. Через «Експорт» базу можна передати друзям.',
       'status.cancelled': 'Скасовано: {msg}',
       'status.noAudio': 'Немає звуку! Вибери «Весь екран» і постав галочку «Поділитися системним аудіо». Або запусти сайт через start.bat — тоді звук береться лише з гри.',
@@ -87,12 +81,6 @@ const I18n = (() => {
       'map.hint': 'Hover a cargo on the map for details. Click assigns the last sound to it, right-click clears.',
       'h.level': 'Sound level', 'lbl.sens': 'Sensitivity', 'lbl.thr': 'Match threshold', 'lbl.beep': 'Beep', 'unit.db': 'dB',
       'h.log': 'Log', 'h.sounds': 'Sounds', 'btn.lib': 'Import library',
-      'h.buys': 'Purchases', 
-      'buys.clear': 'Clear', 'buys.del': 'Delete entry', 'buys.noSound': 'no sound', 'buys.summary': '· base {base} · yours {mine} · red {red}',
-      'buys.empty': 'Nothing recorded yet. Hover a cargo (so the price is known), drag it and buy it — the purchase is recorded from the “… obtained [item]” line above the grid. Or click an item tile in the result card.',
-      'buys.confirm': 'Record purchase: got “{item}”?', 'buys.clearAsk': 'Delete all recorded purchases?',
-      'log.bought': 'Purchase recorded: {sound}, {price} → {item}',
-      'card.mine': 'Purchases with this sound in the base: {n} — the odds already include them', 'card.recordHint': 'Bought it? Click the item you got to record it (or it is recorded from the game feed).',
       'tip.profile': 'Map and mode: odds depend on them', 'opt.allMaps': 'All maps (average)',
       'lbl.blue': 'Blue', 'tip.blue': 'abibuilder tables list blue items at the merchant, but they never show up in game',
       'ph.newName': 'Sound name, e.g. "Glass"', 'btn.add': 'Add',
@@ -104,7 +92,7 @@ const I18n = (() => {
       'help.4': '<b>Hover.</b> Hover a cargo — the site reads its name and price from the tooltip and shows the red chance before you drag it.',
       'help.5': '<b>Drag.</b> Drag the cargo: the sound tells what is inside. Possible items with percentages appear on the map.',
       'help.6': 'Reds only drop from Mystery Cargo (common, Uncommon, Rare). Cargo named after a category (Tools, Paper…) is dimmed on the map.',
-      'help.7': '<b>Bought it?</b> The purchase is recorded from the game line “… obtained [item]” if you hovered and dragged that cargo first. The map does not change after a purchase — press “Scan again”. The more purchases, the more accurate the odds for shared sounds.',
+      'help.7': '<b>Bought something?</b> The map stays as it was. Press <b>Scan again</b> and scroll the list once more.',
       'help.note': 'Everything is stored in the browser. Use "Export" to share the base with friends.',
       'status.cancelled': 'Cancelled: {msg}',
       'status.noAudio': 'No audio! Pick "Entire screen" and tick "Share system audio". Or open the site via start.bat — then only the game sound is used.',
@@ -162,12 +150,6 @@ const I18n = (() => {
       'map.hint': 'Наведи мышку на груз на схеме, чтобы увидеть подробности. Клик назначает ему последний звук, правый клик очищает.',
       'h.level': 'Уровень звука', 'lbl.sens': 'Чувствительность', 'lbl.thr': 'Порог совпадения', 'lbl.beep': 'Сигнал', 'unit.db': 'дБ',
       'h.log': 'Журнал', 'h.sounds': 'Звуки', 'btn.lib': 'Импорт библиотеки',
-      'h.buys': 'Покупки', 
-      'buys.clear': 'Очистить', 'buys.del': 'Удалить запись', 'buys.noSound': 'без звука', 'buys.summary': '· база {base} · твои {mine} · красных {red}',
-      'buys.empty': 'Пока ничего не записано. Наведи на груз (чтобы сайт знал цену), дёрни и купи — покупка запишется сама из строки «… obtained [предмет]» над сеткой. Или кликни плитку предмета в карточке результата.',
-      'buys.confirm': 'Записать покупку: выпало «{item}»?', 'buys.clearAsk': 'Удалить все записанные покупки?',
-      'log.bought': 'Записал покупку: {sound}, {price} → {item}',
-      'card.mine': 'Покупок с этим звуком в базе: {n} — шансы уже их учитывают', 'card.recordHint': 'Купил? Кликни выпавший предмет — запишу (или запишется сам из строки игры).',
       'tip.profile': 'Карта и режим: от них зависят шансы', 'opt.allMaps': 'Все карты (среднее)',
       'lbl.blue': 'Синие', 'tip.blue': 'В таблицах abibuilder синие предметы у торговца есть, но в игре они не попадаются',
       'ph.newName': 'Название звука, напр. «Стекло»', 'btn.add': 'Добавить',
@@ -179,7 +161,7 @@ const I18n = (() => {
       'help.4': '<b>Наведи.</b> Наведи курсор на груз — сайт прочитает название и цену из рамки и покажет шанс красного ещё до перетаскивания.',
       'help.5': '<b>Перетащи.</b> Дёрни груз: звук уточнит, что внутри. На схеме появятся возможные предметы с процентами.',
       'help.6': 'Красные бывают только в Mystery Cargo (обычный, Uncommon, Rare). Грузы с названием категории (Tools, Paper…) на схеме приглушены.',
-      'help.7': '<b>Купил?</b> Покупка запишется сама из строки игры «… obtained [предмет]», если перед этим наводил на груз и дёргал его. Схема после покупки не меняется — нажми «Искать заново». Чем больше покупок, тем точнее шансы для общих звуков.',
+      'help.7': '<b>Купил?</b> Схема остаётся как была. Нажми <b>Искать заново</b> и пролистай список ещё раз.',
       'help.note': 'Всё хранится в браузере. Через «Экспорт» базу можно передать друзьям.',
       'status.cancelled': 'Отменено: {msg}',
       'status.noAudio': 'Нет звука! Выбери «Весь экран» и поставь галочку «Поделиться системным звуком». Или запусти сайт через start.bat — тогда звук берётся только из игры.',
@@ -241,7 +223,7 @@ const I18n = (() => {
     return s;
   }
 
-  // Статичні тексти сторінки: елементи з data-i18n*
+  // Static page texts: elements with data-i18n*
   function apply(root = document) {
     document.documentElement.lang = lang;
     root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });

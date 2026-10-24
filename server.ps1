@@ -1,5 +1,5 @@
-﻿# Локальний сервер ABI Kaluvan (без встановлення нічого): роздає сайт і передає йому звук лише гри.
-# Сам сервер — у helper.cs, тут лише компіляція й запуск.
+﻿# ABI Kaluvan local server (nothing to install): serves the site and streams to it the sound of the game only.
+# The server itself is in helper.cs; this script only compiles and starts it.
 param([string]$Exe = 'UAGame', [int]$Port = 8777, [switch]$NoUpdate)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $port = $Port
@@ -13,17 +13,17 @@ try {
   exit 0
 } catch { }
 
-# Новий реліз на GitHub — оновлюємось і запускаємо вже оновлений server.ps1
+# A new release on GitHub: update and start the already updated server.ps1
 if (-not $NoUpdate -and (& (Join-Path $PSScriptRoot 'update.ps1') -Root $PSScriptRoot)) {
   & (Join-Path $PSScriptRoot 'server.ps1') -Exe $Exe -Port $Port -NoUpdate
   exit
 }
 
-# Спільна база покупок: злити свою з GitHub, свої нові — у спільну (див. sync.ps1)
+# Shared purchase base: merge yours with GitHub, send your new ones to the shared base (see sync.ps1)
 & (Join-Path $PSScriptRoot 'sync.ps1') -Root $PSScriptRoot
 
-# Ярлик «ABI Kaluvan» з іконкою (у .bat іконки бути не може): у папці програми — завжди актуальний
-# (папку могли перенести), на робочому столі — лише один раз, щоб не повертати видалений
+# "ABI Kaluvan" shortcut with the icon (a .bat cannot have an icon): in the app folder it is always kept up to date
+# (the folder may have been moved), on the desktop it is created only once, so a deleted one is not brought back
 try {
   $sh = New-Object -ComObject WScript.Shell
   $bat = Join-Path $PSScriptRoot 'start.bat'

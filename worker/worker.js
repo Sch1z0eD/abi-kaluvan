@@ -1,6 +1,6 @@
-// Cloudflare Worker: приймає покупки від програм гравців, перевіряє й дописує спільну базу
-// library/purchases.json у репозиторії на GitHub. Токен GitHub — лише в секретах Worker'а (GITHUB_TOKEN),
-// тож ні в коді, ні в програмі гравців нічого секретного немає.
+// Cloudflare Worker: receives purchases from players' apps, validates them and appends them to the shared base
+// library/purchases.json in the GitHub repository. The GitHub token lives only in the Worker's secrets (GITHUB_TOKEN),
+// so neither the code nor the players' app holds anything secret.
 //
 // POST /submit  { "purchases": [ { t, soundId, size, label, price, itemId }, ... ] }  → { added }
 
@@ -8,9 +8,9 @@ const REPO = 'neverh8me/abi-kaluvan';
 const BRANCH = 'main';
 const BASE_PATH = 'library/purchases.json';
 const RAW = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/`;
-const BATCH = 25;              // програма шле не більше стількох за раз
-const BODY_MAX = 32 * 1024;    // байтів у запиті
-const PER_HOUR = 12;           // запитів з однієї IP на годину
+const BATCH = 25;              // the app sends no more than this at once
+const BODY_MAX = 32 * 1024;    // bytes per request
+const PER_HOUR = 12;           // requests per IP per hour
 const LABELS = new Set(['', 'Mystery Cargo', 'Uncommon Mystery Cargo', 'Rare Mystery Cargo', 'Military Items', 'Medical Supplies',
   'Computer Parts', 'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials',
   'Electronics', 'Flammables', 'Tools', 'Paper']);
@@ -35,7 +35,7 @@ export default {
     const clean = list.map(e => cleanEntry(e, cat)).filter(Boolean);
     if (!clean.length) return json({ added: 0 });
 
-    // дописуємо в базу на GitHub; якщо хтось записав одночасно (конфлікт) — пробуємо ще раз
+    // append to the base on GitHub; if someone wrote at the same time (conflict), try again
     for (let attempt = 0; attempt < 3; attempt++) {
       const cur = await gh(env, `contents/${BASE_PATH}?ref=${BRANCH}`);
       if (!cur.ok) return json({ error: 'github read ' + cur.status }, 502);
@@ -62,7 +62,7 @@ export default {
   },
 };
 
-// Не більше PER_HOUR запитів з однієї IP на годину (лічильник у кеші Cloudflare)
+// At most PER_HOUR requests per IP per hour (a counter in the Cloudflare cache)
 async function allow(ip, ctx) {
   const cache = caches.default;
   const hour = Math.floor(Date.now() / 3600e3);
@@ -74,7 +74,7 @@ async function allow(ip, ctx) {
   return true;
 }
 
-// Довідник з репозиторію: які предмети бувають у якого звуку, назви, якість і ціни пулів
+// Catalog from the repository: which items each sound can be, names, quality and pool prices
 let cached = null, cachedAt = 0;
 async function catalog() {
   if (cached && Date.now() - cachedAt < 3600e3) return cached;
@@ -97,7 +97,7 @@ async function catalog() {
   return cached;
 }
 
-// Лише відомі поля з правдоподібними значеннями, без вільного тексту (як sync.ps1)
+// Only known fields with plausible values, no free text (same as sync.ps1)
 function cleanEntry(e, cat) {
   if (!e || typeof e !== 'object') return null;
   const t = Number(e.t), price = Number(e.price), itemId = Number(e.itemId);

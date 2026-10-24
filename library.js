@@ -1,15 +1,15 @@
 'use strict';
-// Імпорт бібліотеки звуків «Прослушки»: library/groups.json, merchant.json, names_ru.json і sounds/*.wav.
-// groups.json: звук гри → група предметів; merchant.json: пули полевого торговця з вагами (abibuilder.com).
+// Import of the "Proslushka" sound library: library/groups.json, merchant.json, names_ru.json and sounds/*.wav.
+// groups.json: game sound → item group; merchant.json: Field Merchant pools with weights (abibuilder.com).
 const Library = (() => {
   const RARITY = { 6: 'red', 5: 'gold', 4: 'purple', 3: 'blue', 2: 'green', 1: 'white' };
 
-  // files: [{ path, blob }] — шлях будь-який, шукаємо за кінцем
+  // files: [{ path, blob }] — any path, matched by its ending
   async function load(files, decodeCtx, onProgress = () => {}) {
     const find = tail => files.find(f => f.path.replace(/\\/g, '/').toLowerCase().endsWith(tail.toLowerCase()));
     const readJson = async tail => {
       const f = find(tail);
-      if (!f) throw new Error(`Не знайдено ${tail}. Вибери папку «Прослушка» або її папку library.`);
+      if (!f) throw new Error(`${tail} not found. Choose the "Proslushka" folder or its library folder.`);
       return JSON.parse(await f.blob.text());
     };
     const groups = (await readJson('groups.json')).groups;
@@ -19,8 +19,8 @@ const Library = (() => {
 
     const profiles = merchant.profiles.filter(p => p.maps && p.maps.length);
     const weights = itemWeights(merchant, profiles);
-    // Пули Mystery Cargo — змішані (предмети різних категорій); вантажі з назвою категорії
-    // («Tools», «Paper»…) — однокатегорійні, і краснух у них не буває
+    // Mystery Cargo pools are mixed (items of different categories); cargo named after a category
+    // ("Tools", "Paper"…) holds a single category, and reds never drop from it
     const catOf = new Map(merchant.items.map(it => [it.id, it.category]));
     const mixed = pl => new Set(pl.items.map(([id]) => catOf.get(id))).size > 1;
     const weightsMix = itemWeights(merchant, profiles, mixed);
@@ -31,7 +31,7 @@ const Library = (() => {
     const total = groups.reduce((n, g) => n + g.sounds.length, 0);
     for (const g of groups) {
       const upEvent = g.events.find(e => /_Up$/i.test(e)) || g.events[0];
-      // предмети групи: з торговця (там ваги), плюс ті, що є лише в groups.json
+      // group items: from the merchant (it has weights), plus those only present in groups.json
       const ids = new Set(merchant.items.filter(it => it.sound === upEvent).map(it => it.id));
       for (const it of g.items) if (it.id) ids.add(it.id);
       const items = [...ids].map(id => {
@@ -50,14 +50,14 @@ const Library = (() => {
           category: m.category || '',
           w: avg(wp),
           wp,
-          wm: avg(wpm), // вага лише серед вантажів Mystery Cargo
+          wm: avg(wpm), // weight among Mystery Cargo only
           wpm,
-          img: `library/images/${id}.png`, // іконки з abibuilder.com, лежать поруч у library/images
+          img: `library/images/${id}.png`, // icons from abibuilder.com, stored in library/images
         };
       });
 
-      // up — еталони «взяв» (їх і впізнаємо), down — «поклав» (такий звук пропускаємо).
-      // Еталони живуть лише в памʼяті: їх швидше перебудувати з wav, ніж зберігати.
+      // up — "pick up" templates (these are recognized), down — "put down" (such a sound is skipped).
+      // Templates live only in memory: rebuilding them from wav is faster than storing them.
       const up = [], down = [];
       let dur = 0;
       for (const s of g.sounds) {
@@ -69,11 +69,11 @@ const Library = (() => {
         if (s.kind === 'up' && !s.disabled) { up.push(res.tpl); dur = Math.max(dur, res.dur); }
         else if (s.kind !== 'up') down.push(res.tpl);
       }
-      // англійська назва звуку — три найчастіші предмети групи (у groups.json назви лише російські)
+      // English sound name — the three most frequent items of the group (groups.json has Russian names only)
       const nameEn = [...items].sort((a, b) => b.w - a.w).slice(0, 3).map(it => it.nameEn).join(', ');
       sounds.push({ id: 'lib:' + g.id, lib: true, name: g.title || g.id, nameEn, up, down, dur: +dur.toFixed(2), items });
     }
-    // Пули торговця (для ціни з рамки): ціна, вага, чи це Mystery Cargo, предмети з вагами
+    // Merchant pools (for the tooltip price): price, weight, whether it is Mystery Cargo, items with weights
     const liveIds = new Set(profiles.map(p => p.id));
     const pools = merchant.pools.filter(pl => liveIds.has(pl.profile)).map(pl => ({
       profile: pl.profile, price: pl.price, weight: pl.weight, mixed: mixed(pl),
@@ -90,8 +90,8 @@ const Library = (() => {
     };
   }
 
-  // Імовірність, що випадковий вантаж торговця містить предмет, окремо для кожного профілю (карта + режим).
-  // poolFilter — лише вантажі певного виду (наприклад, Mystery Cargo).
+  // Probability that a random merchant cargo holds the item, per profile (map + mode).
+  // poolFilter — only cargo of a certain kind (for example Mystery Cargo).
   function itemWeights(merchant, profiles, poolFilter = () => true) {
     const out = new Map();
     for (const p of profiles) {
