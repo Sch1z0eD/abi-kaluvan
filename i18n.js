@@ -231,9 +231,9 @@ const I18n = (() => {
   };
   const LOCALE = { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' };
   const KEY = 'abi-ear-lang-v1';
-  let lang = 'uk';
-  try { lang = JSON.parse(localStorage.getItem(KEY)) || 'uk'; } catch {}
-  if (!DICT[lang]) lang = 'uk';
+  let lang = 'en';
+  try { lang = JSON.parse(localStorage.getItem(KEY)) || 'en'; } catch {}
+  if (!DICT[lang]) lang = 'en';
 
   function t(key, vars) {
     let s = DICT[lang][key] ?? DICT.uk[key] ?? key;

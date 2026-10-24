@@ -456,7 +456,7 @@ namespace AbiEar
                     if (old != null) old.Dispose();
                     hasPending.Set();
                 }
-                catch (Exception e) { Console.WriteLine("знімок екрана не вдався: " + e.Message); Thread.Sleep(1000); }
+                catch (Exception e) { Console.WriteLine("screen capture failed: " + e.Message); Thread.Sleep(1000); }
                 int rest = SCREEN_FRAME_MS - (int)(watch.ElapsedMilliseconds - started);
                 if (rest > 0) Thread.Sleep(rest);
             }
@@ -488,7 +488,7 @@ namespace AbiEar
                     byte[] frame = Screen.Encode(bmp);
                     foreach (var ws in list) Send(ws, frame, WebSocketMessageType.Binary);
                 }
-                catch (Exception e) { Console.WriteLine("кадр екрана не вдався: " + e.Message); }
+                catch (Exception e) { Console.WriteLine("screen frame failed: " + e.Message); }
                 finally { bmp.Dispose(); }
             }
         }
@@ -505,7 +505,7 @@ namespace AbiEar
             status = "{\"type\":\"status\",\"state\":\"" + state + "\",\"pid\":" + pid + ",\"rate\":" + Loopback.SAMPLE_RATE +
                      ",\"message\":\"" + (message ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}";
             Broadcast(Encoding.UTF8.GetBytes(status), WebSocketMessageType.Text);
-            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + "  " + (state == "game" ? "слухаю гру (PID " + pid + ")" : state == "wait" ? "гра не запущена, чекаю " + message : "помилка: " + message));
+            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + "  " + (state == "game" ? "listening to the game (PID " + pid + ")" : state == "wait" ? "game is not running, waiting for " + message : "error: " + message));
         }
 
         static void CaptureLoop(string exe)

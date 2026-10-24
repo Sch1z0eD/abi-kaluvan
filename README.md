@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="200" alt="ABI Kaluvan"></p>
+
 # ABI Kaluvan
 
 **ABI Kaluvan** is a local web app for *Arena Breakout: Infinite*. It helps you work out what is inside the Field Merchant's mystery cargo before you buy it.
@@ -43,7 +45,7 @@ Nothing needs to be installed. The helper is compiled on the fly by the built-in
 ## Quick start
 
 1. Download or clone this repository.
-2. Run **`start.bat`**. A local server starts at `http://localhost:8777/` and the page opens in your browser.
+2. Run **`start.bat`**. A local server starts at `http://localhost:8777/` and the page opens in your browser (in English by default; your language choice is remembered). The first run also creates an **ABI Kaluvan** shortcut with the app icon on your desktop and in the app folder. Use it to start the app from then on.
 3. Start the game. Then click **Start catching** on the page.
 4. Open the Field Merchant, with the cursor outside the grid. Slowly scroll the list to the end and wait for the map to freeze.
 5. Use one of two ways to check a cargo:

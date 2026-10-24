@@ -122,14 +122,15 @@ try {
       } catch { break } # ліміт запитів чи сервер недоступний — решту наступного разу
     }
     [IO.File]::WriteAllText($sentFile, (ConvertTo-Json -InputObject @($sent.Keys) -Compress), (New-Object Text.UTF8Encoding($false)))
-    if ($done) { Write-Host "Твої покупки ($done) відправлено в спільну базу." -ForegroundColor Green }
+    if ($done) { Write-Host "Sent $done of your purchases to the shared database." -ForegroundColor Green }
   }
 
   if (-not $isClone -and ($added -gt 0 -or $merged.Count -ne $local.Count)) {
     $out = [ordered]@{ updated = [DateTime]::UtcNow.ToString('o'); purchases = @($merged) }
     [IO.File]::WriteAllText($baseFile, (ConvertTo-Json -InputObject $out -Depth 4), (New-Object Text.UTF8Encoding($false)))
   }
-  Write-Host "Спільна база покупок: $($merged.Count)." -ForegroundColor DarkGray
+  if ($online) { Write-Host "Purchase database updated to the latest version (purchases: $($merged.Count))." -ForegroundColor Green }
+  else { Write-Host "Could not reach the purchase database (offline?), using the local copy (purchases: $($merged.Count))." -ForegroundColor DarkYellow }
 } catch {
-  Write-Host "Синхронізація бази покупок не вдалася: $($_.Exception.Message)" -ForegroundColor DarkYellow
+  Write-Host "Purchase database sync failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
 }
