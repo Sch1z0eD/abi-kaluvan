@@ -8,13 +8,15 @@ param([string]$Root = $PSScriptRoot)
 $BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'
 $FORM_POST   = 'https://docs.google.com/forms/d/e/1FAIpQLScEQr6lGVb0-fzTCv2SwBMrOyQqU-vlUyQY1zf_exOF9479RQ/formResponse'
 $FORM_FIELD  = 'entry.1614546192'
-$SHEET_CSV   = 'https://docs.google.com/spreadsheets/d/1bUAUAnvev5xRf14e0uN9IHA23ZjtnKm2ywkb7pNIseg/export?format=csv&gid=1589502385' # таблиця відповідей форми (має бути відкрита за посиланням)
+$SHEET_CSV   = ''   # таблиця відповідей форми — лише в автора, у локальному author.json (не в git)
 $BATCH       = 25   # стільки покупок в одній відповіді форми
 $UA          = 'abi-kaluvan-sync'
 
 $baseFile = Join-Path $Root 'library\purchases.json'
 $sentFile = Join-Path $Root '.purchases-sent.json'
 $isAuthor = Test-Path (Join-Path $Root '.git')
+$authorFile = Join-Path $Root 'author.json'
+if ($isAuthor -and (Test-Path $authorFile)) { try { $SHEET_CSV = [string](Get-Content $authorFile -Raw -Encoding UTF8 | ConvertFrom-Json).sheetCsv } catch {} }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Key($e) { "$($e.t)|$($e.itemId)|$($e.price)" }
@@ -37,8 +39,11 @@ function ValidPairs {
   $g = Get-Content (Join-Path $Root 'library\groups.json') -Raw -Encoding UTF8 | ConvertFrom-Json
   $m = Get-Content (Join-Path $Root 'library\merchant.json') -Raw -Encoding UTF8 | ConvertFrom-Json
   $pairs = @{}
-  $script:names = @{}
-  foreach ($it in $m.items) { $script:names["$($it.id)"] = [string]$it.en }
+  $script:names = @{}; $script:quals = @{}; $script:poolPrices = @{}
+  $rarity = @{ 6 = 'red'; 5 = 'gold'; 4 = 'purple'; 3 = 'blue'; 2 = 'green'; 1 = 'white' }
+  foreach ($it in $m.items) { $script:names["$($it.id)"] = [string]$it.en; $script:quals["$($it.id)"] = $rarity[[int]$it.rarity] }
+  # ціни пулів торговця, у яких трапляється предмет: справжня покупка коштує саме стільки (± знижка/націнка)
+  foreach ($pl in $m.pools) { foreach ($pi in $pl.items) { $k = "$($pi[0])"; if (-not $script:poolPrices[$k]) { $script:poolPrices[$k] = @() }; $script:poolPrices[$k] += [double]$pl.price } }
   foreach ($grp in $g.groups) {
     foreach ($it in $grp.items) { if ($it.id -and -not $script:names.ContainsKey("$($it.id)")) { $script:names["$($it.id)"] = [string]$it.en } }
     $up = @($grp.events | Where-Object { $_ -match '_Up$' })[0]
@@ -51,7 +56,6 @@ function ValidPairs {
 }
 
 # Лише відомі поля з правдоподібними значеннями; інше (сміття, спам) відкидаємо
-$QS = 'red', 'gold', 'purple', 'blue', 'green', 'white', ''
 # написи вантажів, як їх записує сайт (MYSTERY_TIERS у index.html і LABELS у ocr.js)
 $LABELS = '', 'Mystery Cargo', 'Uncommon Mystery Cargo', 'Rare Mystery Cargo', 'Military Items', 'Medical Supplies',
   'Computer Parts', 'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials',
@@ -61,12 +65,16 @@ function Clean($e, $pairs) {
   try { $t = [double]$e.t; $price = [double]$e.price } catch { return $null }
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   if ($t -lt 1735689600000 -or $t -gt $now + 86400000) { return $null }   # з 2025 року й не з майбутнього
-  if ($price -ne 0 -and ($price -lt 1000 -or $price -gt 10000000)) { return $null }
   if (-not $e.soundId -or $null -eq $e.itemId -or -not $pairs.ContainsKey("$($e.soundId)|$($e.itemId)")) { return $null }
+  # ціна має збігатися з ціною якогось пулу, де є цей предмет (як на сайті: ±28%, з націнкою 10%)
+  $plausible = $false
+  foreach ($pp in @($script:poolPrices["$($e.itemId)"])) {
+    if ($pp -gt 0 -and $price -gt 0 -and [Math]::Min([Math]::Abs([Math]::Log($price / $pp)), [Math]::Abs([Math]::Log($price / ($pp * 1.1)))) -le 0.25) { $plausible = $true; break }
+  }
+  if (-not $plausible) { return $null }
   $size = [string]$e.size
   if ($size -and $size -notmatch '^[1-9]x[1-9]$') { return $null }
-  $q = [string]$e.q
-  if ($QS -notcontains $q) { return $null }
+  $q = [string]$script:quals["$($e.itemId)"]   # якість — з довідника, не з запису
   # Жодного вільного тексту в спільній базі (щоб туди ніяк не потрапив нік чи інше з екрана):
   # назва предмета — з довідника за id, напис вантажу — лише з відомого списку
   $label = [string]$e.label
@@ -99,7 +107,9 @@ try {
       $csv = Fetch $SHEET_CSV 8
       foreach ($row in ($csv | ConvertFrom-Csv)) {
         $cell = @($row.PSObject.Properties.Value)[1]
-        foreach ($e in (ReadList $cell)) { $c = Clean $e $pairs; if ($c) { $incoming += [pscustomobject]$c } }
+        $list = @(ReadList $cell)
+        if ($list.Count -gt $BATCH) { continue } # програма шле не більше $BATCH за раз — більше підробка
+        foreach ($e in $list) { $c = Clean $e $pairs; if ($c) { $incoming += [pscustomobject]$c } }
       }
     } catch { Write-Host "Таблицю покупок гравців не вдалося прочитати: $($_.Exception.Message)" -ForegroundColor DarkYellow }
   }
