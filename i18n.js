@@ -9,6 +9,10 @@ const I18n = (() => {
       'update.available': 'Вийшла v{v} — перезапусти start.bat, щоб оновитись',
       'h.result': 'Результат', 'result.wait': 'Чекаю на звук…',
       'btn.done': 'Готово', 'btn.rescan': 'Шукати заново',
+      'mode.title': 'Як показувати результат: на другому моніторі чи вікном поверх гри', 'mode.second': 'Другий екран', 'mode.overlay': 'Оверлей (1 монітор)', 'btn.overlay': 'Відкрити оверлей',
+      'overlay.here': 'Результат і схема — у вікні оверлея поверх гри.', 'log.overlay': 'Оверлей відкрито: перетягни його на ліву половину екрана (праву, з торговцем, сайт сканує).', 'log.noPip': 'Цей браузер не вміє вікно поверх гри — відкрий сайт у Chrome або Edge.',
+      'help.8': '<b>Один монітор?</b> Вгорі вибери <b>Оверлей</b>: після «Почати ловлю» результат і схема зʼявляться в маленькому вікні поверх гри. Постав його на ліву половину екрана.',
+
       'map.hint': 'Наведи мишку на вантаж на схемі, щоб побачити подробиці. Клік призначає йому останній звук, правий клік очищає.',
       'h.level': 'Рівень звуку', 'lbl.sens': 'Чутливість', 'lbl.thr': 'Поріг збігу', 'lbl.beep': 'Сигнал', 'unit.db': 'дБ',
       'h.log': 'Журнал', 'h.sounds': 'Звуки', 'btn.lib': 'Імпорт бібліотеки',
@@ -78,6 +82,10 @@ const I18n = (() => {
       'update.available': 'v{v} is out — restart start.bat to update',
       'h.result': 'Result', 'result.wait': 'Waiting for a sound…',
       'btn.done': 'Done', 'btn.rescan': 'Scan again',
+      'mode.title': 'Where to show the result: on a second monitor or in a window over the game', 'mode.second': 'Second screen', 'mode.overlay': 'Overlay (one monitor)', 'btn.overlay': 'Open overlay',
+      'overlay.here': 'The result and the map are in the overlay window over the game.', 'log.overlay': 'Overlay opened: drag it to the left half of the screen (the right half, with the merchant, is scanned).', 'log.noPip': 'This browser cannot show a window over the game — open the site in Chrome or Edge.',
+      'help.8': '<b>One monitor?</b> Pick <b>Overlay</b> at the top: after "Start catching" the result and the map appear in a small window over the game. Put it on the left half of the screen.',
+
       'map.hint': 'Hover a cargo on the map for details. Click assigns the last sound to it, right-click clears.',
       'h.level': 'Sound level', 'lbl.sens': 'Sensitivity', 'lbl.thr': 'Match threshold', 'lbl.beep': 'Beep', 'unit.db': 'dB',
       'h.log': 'Log', 'h.sounds': 'Sounds', 'btn.lib': 'Import library',
@@ -147,6 +155,10 @@ const I18n = (() => {
       'update.available': 'Вышла v{v} — перезапусти start.bat, чтобы обновиться',
       'h.result': 'Результат', 'result.wait': 'Жду звук…',
       'btn.done': 'Готово', 'btn.rescan': 'Искать заново',
+      'mode.title': 'Как показывать результат: на втором мониторе или окном поверх игры', 'mode.second': 'Второй экран', 'mode.overlay': 'Оверлей (1 монитор)', 'btn.overlay': 'Открыть оверлей',
+      'overlay.here': 'Результат и схема — в окне оверлея поверх игры.', 'log.overlay': 'Оверлей открыт: перетащи его на левую половину экрана (правую, с торговцем, сайт сканирует).', 'log.noPip': 'Этот браузер не умеет окно поверх игры — открой сайт в Chrome или Edge.',
+      'help.8': '<b>Один монитор?</b> Вверху выбери <b>Оверлей</b>: после «Начать ловлю» результат и схема появятся в маленьком окне поверх игры. Поставь его на левую половину экрана.',
+
       'map.hint': 'Наведи мышку на груз на схеме, чтобы увидеть подробности. Клик назначает ему последний звук, правый клик очищает.',
       'h.level': 'Уровень звука', 'lbl.sens': 'Чувствительность', 'lbl.thr': 'Порог совпадения', 'lbl.beep': 'Сигнал', 'unit.db': 'дБ',
       'h.log': 'Журнал', 'h.sounds': 'Звуки', 'btn.lib': 'Импорт библиотеки',

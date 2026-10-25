@@ -65,6 +65,13 @@
   .tile b { font-size: 15px; font-variant-numeric: tabular-nums; }
 
   .lang { margin-left: auto; }
+  /* overlay window (one monitor): the result card and the map float above the game */
+  .overlay { padding: 8px; }
+  .overlay #result { padding: 10px; min-height: 0; }
+  .overlay #result .big { font-size: 28px; }
+  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; }
+  .overlay .tile img { width: 48px; height: 48px; }
+  .overlay .map-wrap { max-height: none; margin-top: 8px; }
   .update { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #3b82f6; color: #93c5fd; text-decoration: none; font-size: 13px; }
   .update:hover { background: rgba(59, 130, 246, .15); }
   .update:not([hidden]) + .lang { margin-left: 0; }
@@ -112,6 +119,10 @@
   <button id="btnStart" class="primary" data-i18n="btn.start">Start catching</button>
   <button id="btnStop" disabled data-i18n="btn.stop">Stop</button>
   <span class="status" id="status" data-i18n="status.idle">Not running</span>
+  <select id="mode" class="mode" data-i18n-title="mode.title">
+    <option value="second" data-i18n="mode.second">Second screen</option><option value="overlay" data-i18n="mode.overlay">Overlay (one monitor)</option>
+  </select>
+  <button id="btnOverlay" hidden data-i18n="btn.overlay">Open overlay</button>
   <a id="update" class="update" target="_blank" rel="noopener" hidden></a>
   <select id="lang" class="lang" title="Мова · Language · Язык">
     <option value="uk">UA</option><option value="en">ENG</option><option value="ru">RU</option>
@@ -121,6 +132,7 @@
 <div class="top">
   <section class="result-col">
     <h2 data-i18n="h.result">Result</h2>
+    <p id="overlayNote" class="muted" hidden data-i18n="overlay.here"></p>
     <div id="result"><span class="muted" data-i18n="result.wait">Waiting for a sound…</span></div>
   </section>
 
@@ -131,7 +143,7 @@
       <button id="btnDone" class="primary" hidden data-i18n="btn.done">Done</button>
       <button id="btnRescan" hidden data-i18n="btn.rescan">Scan again</button>
     </div>
-    <div class="map-wrap"><canvas id="map" width="360" height="200"></canvas></div>
+    <div class="map-wrap" id="mapWrap"><canvas id="map" width="360" height="200"></canvas></div>
     <p class="muted" style="margin:8px 0 0" data-i18n="map.hint"></p>
   </section>
 </div>
@@ -191,6 +203,7 @@
         <li data-i18n-html="help.5"></li>
         <li data-i18n-html="help.6"></li>
         <li data-i18n-html="help.7"></li>
+        <li data-i18n-html="help.8"></li>
       </ol>
       <p class="muted" data-i18n="help.note"></p>
     </section>
@@ -267,6 +280,7 @@ const REDETECT_MAX_CARGO = 6; // this many cargo found: the cell size is certain
 const PROFILES_KEY = 'abi-ear-profiles-v1';
 const PROFILE_KEY = 'abi-ear-profile-v1';
 const BLUE_KEY = 'abi-ear-blue-v1';
+const MODE_KEY = 'abi-kaluvan-mode-v1'; // display mode: 'second' (second screen) or 'overlay' (one monitor)
 const PURCHASES_KEY = 'abi-kaluvan-purchases-v2'; // v1 had records from the nickname bug, not used
 const OLD_PURCHASE_KEYS = ['abi-kaluvan-purchases-v1', 'abi-kaluvan-nick-v1'];
 const PRIOR_N = 20;          // the merchant data weighs as much as this many own purchases (more: learns slower)
@@ -306,6 +320,8 @@ let sounds = loadSounds();
 let profiles = loadJson(PROFILES_KEY, []);   // maps from the library: [{ id, name }]
 let profile = loadJson(PROFILE_KEY, '');     // selected map ('' — average over all)
 let includeBlue = loadJson(BLUE_KEY, false); // whether to count blue items
+let mode = loadJson(MODE_KEY, 'second');     // display mode, see MODE_KEY
+let overlayWin = null, overlayParts = [];    // the overlay window and the elements moved into it
 let purchases = loadJson(PURCHASES_KEY, []); // own purchases: [{ t, soundId, size, label, price, itemId, item, q }]
 let basePurchases = [];      // shared base shipped with the app (library/purchases.json) and refreshed from GitHub
 let balance = null, spent = 0;               // Koen balance below the grid and how much it dropped (not yet explained by purchases)
@@ -367,6 +383,7 @@ registerProcessor('tap', Tap);`;
 async function start() {
   beepCtx = beepCtx || new AudioContext(); // created during the click so the browser does not block the sound
   if (typeof Ocr !== 'undefined') Ocr.start().catch(() => {}); // text readers start in advance, in the background
+  if (mode === 'overlay') openOverlay(); // needs this click, so before any await
   // The local server (start.bat) provides the game-only sound and the screen capture, no browser sharing.
   // Without it: browser screen sharing and all PC sound.
   gameWs = await connectGameAudio();
@@ -2027,6 +2044,62 @@ $('btnClear').onclick = () => {
 };
 const syncLabels = () => { ui.sensVal.textContent = ui.sens.value + ' ' + tr('unit.db'); ui.thrVal.textContent = ui.thr.value + '%'; };
 ui.sens.oninput = ui.thr.oninput = syncLabels;
+
+// Display mode. With one monitor the result card and the map go into an always-on-top window over the
+// game (Document Picture-in-Picture, Chrome/Edge). The elements are moved there, not copied, so they keep
+// updating; when the window closes they come back. It belongs on the left half of the screen: only the
+// right half (the merchant) is captured, so the overlay never gets in the way of recognition.
+async function openOverlay() {
+  if (overlayWin) return;
+  if (!('documentPictureInPicture' in window)) { log(tr('log.noPip')); return; }
+  let w;
+  try { w = await documentPictureInPicture.requestWindow({ width: 380, height: 600 }); }
+  catch { log(tr('log.noPip')); return; }
+  overlayWin = w;
+  for (const ss of document.styleSheets) {
+    try {
+      const st = w.document.createElement('style');
+      st.textContent = [...ss.cssRules].map(r => r.cssText).join('\n');
+      w.document.head.append(st);
+    } catch {}
+  }
+  w.document.title = tr('app');
+  const box = w.document.createElement('div');
+  box.className = 'overlay';
+  w.document.body.append(box);
+  overlayParts = [ui.result, $('mapWrap')].map(el => {
+    const ph = document.createComment('overlay');
+    el.replaceWith(ph);
+    box.append(el);
+    return { el, ph };
+  });
+  w.addEventListener('pagehide', () => {
+    for (const { el, ph } of overlayParts) ph.replaceWith(el);
+    overlayParts = [];
+    overlayWin = null;
+    updateModeUi();
+  });
+  log(tr('log.overlay'));
+  updateModeUi();
+}
+
+function updateModeUi() {
+  $('btnOverlay').hidden = mode !== 'overlay' || !!overlayWin;
+  $('overlayNote').hidden = !overlayWin;
+}
+
+const modeSelect = $('mode');
+modeSelect.value = mode;
+modeSelect.onchange = () => {
+  mode = modeSelect.value;
+  try { localStorage.setItem(MODE_KEY, JSON.stringify(mode)); } catch {}
+  if (mode !== 'overlay' && overlayWin) overlayWin.close();
+  if (mode === 'overlay' && stream) openOverlay(); // the change itself is a click, so the window may open
+  updateModeUi();
+};
+$('btnOverlay').onclick = openOverlay;
+updateModeUi();
+
 // UI language: on change, everything with text is redrawn
 const langSelect = $('lang');
 langSelect.value = I18n.lang;

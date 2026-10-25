@@ -30,6 +30,7 @@ The app listens to the game's sound when you drag a cargo, and it watches the me
 - **Game-only capture.** No browser screen sharing is used. The local helper captures:
   - audio from the game process only (WASAPI process loopback);
   - the game window only.
+- **One monitor or two.** Pick **Second screen** to keep the page on another monitor, or **Overlay (one monitor)** to get the result card and the map in a small always-on-top window over the game (Chrome or Edge). Put the overlay on the left half of the screen: only the right half, with the merchant, is captured.
 - **UA / ENG / RU** interface.
 
 ![Hover popup](docs/screenshot-hover.png)
