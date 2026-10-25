@@ -7,7 +7,9 @@ const Vision = (() => {
   const MIN_RUN = 12;       // minimal line segment length for the period search
   const EDGE_FILL = 0.55;   // share of an edge the line has to cover (may be in pieces)
   const EDGE_RUN = 0.25;    // plus at least one solid piece of this length
-  const OCC_T = 40;         // brightness from which a pixel counts as "content"
+  // brightness from which a pixel counts as "content": empty slots are ~0–7, while the cargo background is
+  // only ~18 with a dark in-game picture (it was ~40+ for the original author), so the text alone was not enough
+  const OCC_T = 10;
   const EDGE_REL = 0.6;     // a cargo border is at least this share of the frame's typical border (lines inside revealed cargo ~0.5)
 
   function toGray(data, w, h) {

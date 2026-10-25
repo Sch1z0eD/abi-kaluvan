@@ -3,3 +3,4 @@ client/obj/
 client/publish/
 *.user
 .vs/
+web/_debug/
