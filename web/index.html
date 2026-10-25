@@ -39,6 +39,7 @@
   .muted { color: var(--muted); }
   .help li { margin-bottom: 6px; }
   input[type=range] { width: 140px; }
+  .diag-view { display: block; width: 100%; max-width: 480px; height: auto; background: #000; border-radius: 6px; }
   #log { max-height: 180px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* Steps */
@@ -166,6 +167,17 @@
     <section>
       <h2 data-i18n="h.log">Log</h2>
       <div id="log"></div>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.diag">What the site sees</h2>
+      <canvas id="diagView" class="diag-view" width="320" height="180"></canvas>
+      <p class="muted" id="diagInfo" style="margin:6px 0 0"></p>
+      <div class="row" style="margin-top:10px">
+        <button id="btnSaveFrame" data-i18n="btn.saveFrame">Save frame</button>
+        <button id="btnTestImg" data-i18n="btn.testImg">Test a screenshot</button>
+        <input type="file" id="testImg" accept="image/*" hidden>
+      </div>
     </section>
   </div>
 
@@ -305,6 +317,7 @@ const ui = {
   sens: $('sens'), sensVal: $('sensVal'), thr: $('thr'), thrVal: $('thrVal'), beep: $('beep'),
   map: $('map'), imgFile: $('imgFile'), profile: $('profile'), libDir: $('libDir'),
   stageTitle: $('stageTitle'), stageHint: $('stageHint'), rescan: $('btnRescan'), done: $('btnDone'),
+  diagView: $('diagView'), diagInfo: $('diagInfo'), saveFrame: $('btnSaveFrame'), testImgBtn: $('btnTestImg'), testImg: $('testImg'),
 };
 const specCtx = ui.spec.getContext('2d');
 const mapCtx = ui.map.getContext('2d');
@@ -396,10 +409,12 @@ async function start() {
     startNativeScreen();
   } else {
     try {
+      // resizeMode 'none': ask for the native size; a scaled-down frame blurs the thin grid lines
+      const video = { frameRate: 15, resizeMode: 'none' };
       stream = await navigator.mediaDevices.getDisplayMedia(gameWs
-        ? { video: { frameRate: 15 }, audio: false }
+        ? { video, audio: false }
         : {
-          video: { frameRate: 15 },
+          video,
           audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
           systemAudio: 'include',
         });
@@ -535,6 +550,7 @@ function stop() {
   if (!stream) return;
   stream.getTracks().forEach(t => t.stop());
   stream = null;
+  diag.w = diag.h = 0;
   closeGameAudio();
   closeScreen();
   if (audioCtx) audioCtx.close();
@@ -823,9 +839,83 @@ function regionPx(w, h) {
   return { x: Math.round(w * MERCHANT_SIDE), y: 0, w: w - Math.round(w * MERCHANT_SIDE), h };
 }
 
+// ---------- Grid diagnostics ----------
+// What the site gets and why the grid is not found: frame size, a preview of the searched area,
+// and every DIAG_MS a short report while there is no grid. "Save frame" downloads the whole frame as PNG.
+const DIAG_MS = 5000;
+const DIAG_VIEW_MS = 1000;
+const diag = { w: 0, h: 0, src: '', noPeriod: 0, noGrid: 0, ok: 0, since: 0, viewAt: 0, save: false };
+
+function diagFrame(src, fw, fh, rp) {
+  const kind = frameCropped ? 'client' : 'browser';
+  if (fw !== diag.w || fh !== diag.h || kind !== diag.src) {
+    Object.assign(diag, { w: fw, h: fh, src: kind, noPeriod: 0, noGrid: 0, ok: 0, since: performance.now() });
+    log(tr('log.frame', { w: fw, h: fh, rw: rp.w, rh: rp.h, src: tr(frameCropped ? 'log.screenServer' : 'log.screenBrowser') }));
+    // the browser may scale the shared screen down: thin cell borders then blur and the grid falls apart
+    const screenW = Math.round(screen.width * devicePixelRatio);
+    if (!frameCropped && stream && fw < screenW * 0.9) log(tr('log.frameSmall', { w: fw, sw: screenW }));
+  }
+  if (diag.save) {
+    diag.save = false;
+    const c = document.createElement('canvas');
+    c.width = fw; c.height = fh;
+    c.getContext('2d').drawImage(src, 0, 0, fw, fh);
+    c.toBlob(b => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = `abi-frame-${fw}x${fh}-${Date.now()}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      log(tr('log.frameSaved', { w: fw, h: fh }));
+    }, 'image/png');
+  }
+}
+
+// outcome: 'noPeriod' — no cell lines at all, 'noGrid' — a cell size but no grid, 'ok'
+function diagParse(outcome, now) {
+  diag[outcome]++;
+  if (now - diag.viewAt >= DIAG_VIEW_MS) {
+    diag.viewAt = now;
+    const v = ui.diagView, s = Math.min(1, 480 / fullCanvas.width);
+    const w = Math.max(1, Math.round(fullCanvas.width * s)), h = Math.max(1, Math.round(fullCanvas.height * s));
+    if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
+    const c = v.getContext('2d');
+    c.drawImage(fullCanvas, 0, 0, w, h);
+    if (viewport && P) {
+      c.strokeStyle = '#22c55e'; c.lineWidth = 2;
+      c.strokeRect(viewport.x * s, viewport.y * s, viewport.w * s, viewport.h * s);
+    }
+    ui.diagInfo.textContent = tr('diag.info', { w: diag.w, h: diag.h, p: P ? P.toFixed(1) : '—', n: placedCargo().length });
+  }
+  if (now - diag.since < DIAG_MS) return;
+  if (!diag.ok) {
+    if (diag.noGrid) log(tr('log.gridNoGrid', { p: P.toFixed(1), n: diag.noGrid }));
+    else log(tr('log.gridNoPeriod'));
+  }
+  diag.noPeriod = diag.noGrid = diag.ok = 0;
+  diag.since = now;
+}
+
+// A screenshot of the game (the whole window) instead of the live picture: the same parse, a few dozen times
+async function testScreenshot(file) {
+  const bmp = await createImageBitmap(file);
+  const keepCropped = frameCropped;
+  frameCropped = false;
+  resetScan();
+  for (let i = 0; i < 40; i++) {
+    onVideoFrame(bmp, bmp.width, bmp.height);
+    await new Promise(r => setTimeout(r, SCAN_FAST_MS + 5));
+  }
+  frameCropped = keepCropped;
+  drawMap(); updateStage();
+  log(tr('log.testImg', { w: bmp.width, h: bmp.height, p: P ? P.toFixed(1) : '—', n: placedCargo().length }));
+  bmp.close();
+}
+
 function onVideoFrame(src, fw, fh) {
   const now = performance.now();
   const rp = regionPx(fw, fh);
+  diagFrame(src, fw, fh, rp);
   if (viewport) track(src, rp, now);
   if (now - lastScan >= (phase === 'scan' ? SCAN_FAST_MS : SCAN_MS)) { lastScan = now; analyze(src, rp); }
 }
@@ -874,7 +964,7 @@ function analyze(src, rp) {
   let maps = Vision.lineMaps(G, roi);
   if (!P) {
     P = Vision.detectPeriod(rp.w, rp.h, maps) || 0;
-    if (!P) { lastSeen = null; updateStage(); return; }
+    if (!P) { lastSeen = null; updateStage(); diagParse('noPeriod', performance.now()); return; }
   }
   const now = performance.now();
   let found = Vision.analyze(G, maps, P);
@@ -891,7 +981,7 @@ function analyze(src, rp) {
       if (alt && gridCoverage(alt) > gridCoverage(found) * 1.5) found = alt;
     }
   }
-  if (!found) { lostGrid(now); return; }
+  if (!found) { lostGrid(now); diagParse('noGrid', now); return; }
   // sub-pixel refinements are accepted quietly; a different scale (×2) is a different grid.
   // Nothing but the "Scan again" button touches a ready map: such a frame is simply skipped.
   if (Math.abs(found.P - P) > P * 0.1) {
@@ -904,7 +994,8 @@ function analyze(src, rp) {
   // cargo in the game is always grey, an empty slot is black (sometimes with a dot).
   // 1×1 is not scanned: reds and anything valuable never drop from it, and confirming and reading them takes time.
   let items = found.items.filter(it => it.occ >= OCC_GREY && it.w * it.h > 1);
-  if (!items.length) { lostGrid(now); return; }
+  if (!items.length) { lostGrid(now); diagParse('noGrid', now); return; }
+  diagParse('ok', now);
   // the merchant was closed and reopened in the middle of a scan: this is a different list
   if (phase !== 'frozen' && gridSeenAt && now - gridSeenAt > REOPEN_MS && cargo.size) { log(tr('log.reopen')); resetScan(); }
   gridSeenAt = now;
@@ -1922,6 +2013,16 @@ function log(s) {
 
 // ---------- Events ----------
 ui.start.onclick = start;
+ui.saveFrame.onclick = () => {
+  if (!diag.w) { log(tr('log.noFrame')); return; }
+  diag.save = true;
+};
+ui.testImgBtn.onclick = () => ui.testImg.click();
+ui.testImg.onchange = e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (f) testScreenshot(f).catch(err => log(tr('log.video', { msg: err.message })));
+};
 ui.stop.onclick = stop;
 ui.rescan.onclick = resetScan;
 ui.done.onclick = () => freeze(tr('log.manualFreeze', { n: placedCargo().length }));
