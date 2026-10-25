@@ -123,7 +123,6 @@
     <option value="second" data-i18n="mode.second">Second screen</option><option value="overlay" data-i18n="mode.overlay">Overlay (one monitor)</option>
   </select>
   <button id="btnOverlay" hidden data-i18n="btn.overlay">Open overlay</button>
-  <a id="update" class="update" target="_blank" rel="noopener" hidden></a>
   <select id="lang" class="lang" title="Мова · Language · Язык">
     <option value="uk">UA</option><option value="en">ENG</option><option value="ru">RU</option>
   </select>
@@ -214,6 +213,7 @@
 
 <video id="video" autoplay muted playsinline hidden></video>
 
+<script src="config.js"></script>
 <script src="i18n.js"></script>
 <script src="audio.js"></script>
 <script src="library.js"></script>
@@ -292,7 +292,10 @@ const BALANCE_BELOW = 2.6;   // and no lower than this many cells below the list
 const FEED_WAIT_MS = 30000;  // a feed line waits this long for the balance to confirm it
 const FEED_SAME_MS = 60000;  // the same line (price and similar name) within this window is the same purchase
 const BASE_URL = 'library/purchases.json'; // shared base in the app folder
-const BASE_REMOTE = 'https://raw.githubusercontent.com/neverh8me/abi-kaluvan/main/library/purchases.json'; // and the freshest one on GitHub
+const CONFIG = window.ABI_CONFIG || {};
+const BASE_REMOTE = CONFIG.baseRemote || ''; // and the freshest one on GitHub
+// ABI Kaluvan Client on the player's PC (game-only sound and screen), see config.js
+const CLIENT_URL = (new URLSearchParams(location.search).get('client') || CONFIG.clientUrl || 'ws://localhost:8777').replace(/\/+$/, '');
 
 // ---------- DOM ----------
 const $ = id => document.getElementById(id);
@@ -384,7 +387,7 @@ async function start() {
   beepCtx = beepCtx || new AudioContext(); // created during the click so the browser does not block the sound
   if (typeof Ocr !== 'undefined') Ocr.start().catch(() => {}); // text readers start in advance, in the background
   if (mode === 'overlay') openOverlay(); // needs this click, so before any await
-  // The local server (start.bat) provides the game-only sound and the screen capture, no browser sharing.
+  // The client on this PC (client/) provides the game-only sound and the screen capture, no browser sharing.
   // Without it: browser screen sharing and all PC sound.
   gameWs = await connectGameAudio();
   screenWs = gameWs ? await connectScreen() : null;
@@ -451,12 +454,11 @@ async function start() {
   resetScan();
 }
 
-// Connects to the game sound from the local server. Returns a WebSocket or null if there is no server.
+// Connects to the game sound from the client on this PC. Returns a WebSocket or null if the client is not running.
 function connectGameAudio() {
-  if (!/^https?:$/.test(location.protocol)) return Promise.resolve(null);
   return new Promise(resolve => {
     let ws;
-    try { ws = new WebSocket(`ws://${location.host}/audio`); } catch { resolve(null); return; }
+    try { ws = new WebSocket(`${CLIENT_URL}/audio`); } catch { resolve(null); return; }
     ws.binaryType = 'arraybuffer';
     const timer = setTimeout(() => { ws.close(); resolve(null); }, 1500);
     ws.onmessage = e => {
@@ -478,11 +480,11 @@ function closeGameAudio() {
   ws.close();
 }
 
-// Screen frames from the server (JPEG). Returns a WebSocket or null.
+// Screen frames from the client (JPEG). Returns a WebSocket or null.
 function connectScreen() {
   return new Promise(resolve => {
     let ws;
-    try { ws = new WebSocket(`ws://${location.host}/screen`); } catch { resolve(null); return; }
+    try { ws = new WebSocket(`${CLIENT_URL}/screen`); } catch { resolve(null); return; }
     ws.binaryType = 'arraybuffer';
     const timer = setTimeout(() => { ws.close(); resolve(null); }, 1500);
     ws.onopen = () => { clearTimeout(timer); resolve(ws); };
@@ -1437,7 +1439,6 @@ function recordPurchase({ soundId, size, label, price, itemText, itemId, key }) 
     itemId: it ? it.id : null, item: it ? it.nameEn || it.name : itemText || '', q: it ? it.q : '',
   });
   savePurchases();
-  syncBase();
   if (rec) rec.bought = it || true;
   drawMap();
 }
@@ -1447,7 +1448,8 @@ function savePurchases() {
   try { localStorage.setItem(PURCHASES_KEY, JSON.stringify(purchases)); } catch {}
 }
 
-// Shared base: from the app folder and the freshest from GitHub (if online), both merged
+// Shared base: from the site folder and the freshest from GitHub (if online), both merged.
+// Own purchases stay in this browser only (localStorage) and are not sent anywhere.
 async function loadBase() {
   const get = async url => {
     try {
@@ -1457,35 +1459,10 @@ async function loadBase() {
       return Array.isArray(data.purchases) ? data.purchases : [];
     } catch { return []; }
   };
-  const [local, remote] = await Promise.all([get(BASE_URL), get(BASE_REMOTE)]);
+  const [local, remote] = await Promise.all([get(BASE_URL), BASE_REMOTE ? get(BASE_REMOTE) : []]);
   basePurchases = mergePurchases(local, remote);
   allCache = null;
-  syncBase(); // own purchases not yet in the local file (say, recorded before this version)
   drawMap();
-}
-
-// Own purchases go to a local file (purchases.mine.json via the local server), and from there
-// sync.ps1 sends them to the shared server on the next launch. Without the server (site not via start.bat) this is skipped quietly.
-let syncBusy = false;
-const SHARE_LABELS = new Set(['', ...Object.values(MYSTERY_TIERS).map(t => t.name), 'Military Items', 'Medical Supplies', 'Computer Parts',
-  'Collectibles', 'Instruments', 'Energy Items', 'Household Items', 'Building Materials', 'Electronics', 'Flammables', 'Tools', 'Paper']);
-function shareable(b) {
-  const it = b.itemId != null && itemById.get(b.itemId);
-  if (!b.soundId || !it) return null;
-  return { t: b.t, soundId: b.soundId, size: b.size || '', label: SHARE_LABELS.has(b.label) ? b.label : '', price: b.price || 0, itemId: b.itemId, item: it.nameEn || '', q: it.q || '' };
-}
-async function syncBase() {
-  if (syncBusy || !location.protocol.startsWith('http')) return;
-  syncBusy = true;
-  // No free text into the shared base: item name from the catalog, label only a known one.
-  // This way a nickname or any other piece of a screen line can never get in.
-  const mine = purchases.map(shareable).filter(Boolean);
-  try {
-    await fetch('api/purchases', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Abi-Kaluvan': '1' },
-      body: JSON.stringify({ updated: new Date().toISOString(), purchases: mine }, null, 1),
-    });
-  } catch {} finally { syncBusy = false; }
 }
 
 function cargoName(key) {
@@ -1897,7 +1874,7 @@ async function importLibrary(files) {
 }
 
 // The library sits next to the app in the library folder: it is loaded on every start (templates live only
-// in memory). Works via start.bat (localhost); with file:// the browser does not allow reading files, then the button is used.
+// in memory). Works when the site is served over http(s); with file:// the browser does not allow reading files, then the button is used.
 async function autoLoadLibrary() {
   try {
     const res = await fetch('library/groups.json', { cache: 'no-cache' });
@@ -2106,31 +2083,9 @@ langSelect.value = I18n.lang;
 langSelect.onchange = () => {
   I18n.setLang(langSelect.value);
   if (stream) showGameStatus(gameStatus);
-  syncLabels(); renderProfiles(); renderSounds(); updateStage(); drawMap(); renderUpdate();
+  syncLabels(); renderProfiles(); renderSounds(); updateStage(); drawMap();
 };
 
-// A new release on GitHub: the files are replaced by update.ps1 when start.bat runs, here only a hint
-const REPO = 'neverh8me/abi-kaluvan';
-let latestRelease = null;
-async function checkUpdate() {
-  try {
-    const local = (await (await fetch('version.json', { cache: 'no-cache' })).json()).version;
-    const rel = await (await fetch(`https://api.github.com/repos/${REPO}/releases/latest`)).json();
-    const v = String(rel.tag_name || '').replace(/^v/, '');
-    const num = s => s.split('.').map(Number);
-    const newer = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
-    if (v && newer(v, local)) { latestRelease = { v, url: rel.html_url }; renderUpdate(); }
-  } catch {} // offline or the site is not opened via start.bat: stay quiet
-}
-function renderUpdate() {
-  const a = $('update');
-  if (!latestRelease) return;
-  a.textContent = tr('update.available', { v: latestRelease.v });
-  a.href = latestRelease.url;
-  a.hidden = false;
-}
-checkUpdate();
-setInterval(checkUpdate, 6 * 3600e3);
 I18n.apply();
 syncLabels();
 renderProfiles();
