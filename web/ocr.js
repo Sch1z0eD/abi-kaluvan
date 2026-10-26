@@ -6,9 +6,14 @@ const Ocr = (() => {
     { key: 'raremysterycargo', mystery: 'rare' },
     { key: 'uncommonmysterycargo', mystery: 'uncommon' },
     { key: 'mysterycargo', mystery: 'common' },
+    // name — the label exactly as the merchant pools have it (library/merchant.json), category — the item category
+    { key: 'uncommonmilitaryitems', category: 'Miscellaneous Military Item', name: 'Uncommon Military Items' },
     { key: 'militaryitems', category: 'Miscellaneous Military Item', name: 'Military Items' },
+    { key: 'raremedicalsupplies', category: 'Miscellaneous Medical Item', name: 'Rare Medical Supplies' },
     { key: 'medicalsupplies', category: 'Miscellaneous Medical Item', name: 'Medical Supplies' },
     { key: 'computerparts', category: 'Computer Parts', name: 'Computer Parts' },
+    { key: 'rarecollectibles', category: 'Collectibles', name: 'Rare Collectibles' },
+    { key: 'uncommoncollectibles', category: 'Collectibles', name: 'Uncommon Collectibles' },
     { key: 'collectibles', category: 'Collectibles', name: 'Collectibles' },
     { key: 'instruments', category: 'Instruments', name: 'Instruments' },
     { key: 'energyitems', category: 'Energy Items', name: 'Energy Items' },
@@ -156,15 +161,39 @@ const Ocr = (() => {
     return +digits;
   }
 
+  // All prices in a row of text, by the same digit-group rule as firstPrice: "216,000 270,000" → [216000, 270000]
+  function splitPrices(text) {
+    const out = [];
+    let rest = text;
+    for (let k = 0; k < 3; k++) {
+      const m = rest.match(/\d+/);
+      if (!m) break;
+      rest = rest.slice(m.index);
+      const p = firstPrice(rest);
+      if (p >= 1000) out.push(p);
+      // skip the digits and separators this price took
+      let digits = String(p).length, j = 0;
+      while (j < rest.length && digits > 0) { if (/\d/.test(rest[j])) digits--; j++; }
+      rest = rest.slice(j);
+    }
+    return out;
+  }
+
   // From the tooltip text: the cargo label (with the box of its line) and the price.
   // The price is a number with digit groups: "110,000", "470 000".
   function parseTip(data, k = TIP_SCALE) {
     const lines = (data.lines || []).map(l => ({ text: l.text.trim(), bbox: l.bbox, words: l.words }));
-    let price = 0, priceAt = -1;
+    let price = 0, priceAt = -1, listPrice = 0;
     lines.forEach((l, i) => {
       if (price) return;
-      const m = l.text.replace(/[oO]/g, '0').match(/(\d{1,3}(?:[ ,.]\d{3})+|\d{4,7})/);
-      if (m) { price = firstPrice(m[1]); priceAt = i; }
+      const t = l.text.replace(/[oO]/g, '0');
+      const m = t.match(/(\d{1,3}(?:[ ,.]\d{3})+|\d{4,7})/);
+      if (!m) return;
+      // a discount: the old price is crossed out after the current one ("216,000 270,000"). The old one is the
+      // merchant table price (it picks the pool), the current one is what the cargo costs.
+      const prices = splitPrices(t.slice(m.index));
+      price = prices[0]; priceAt = i;
+      if (prices[1] > price && prices[1] <= price * 2) listPrice = prices[1];
     });
     if (!price || price < 1000) return null;
     // The label in the tooltip is the line right above the price. Labels of neighbouring cargo in the grid
@@ -184,7 +213,7 @@ const Ocr = (() => {
         : above.bbox;
     }
     const scale = b => ({ x0: b.x0 / k, y0: b.y0 / k, x1: b.x1 / k, y1: b.y1 / k });
-    return { price, label, labelBox: labelBox && scale(labelBox), priceBox: scale(priceBox) };
+    return { price, listPrice, label, labelBox: labelBox && scale(labelBox), priceBox: scale(priceBox) };
   }
 
   // Cargo label at the top of a cell: crop, scale up and invert (Tesseract reads dark text on a
@@ -262,5 +291,5 @@ const Ocr = (() => {
     return dp[a.length][b.length];
   }
 
-  return { start, read, readData, labelCanvas, parseLabel, tipCanvas, findTipBox, parseTip, parseFeed, parseBalance, matchName };
+  return { start, read, readData, labelCanvas, parseLabel, tipCanvas, findTipBox, parseTip, splitPrices, parseFeed, parseBalance, matchName };
 })();

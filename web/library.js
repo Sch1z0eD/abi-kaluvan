@@ -20,7 +20,7 @@ const Library = (() => {
     const profiles = merchant.profiles.filter(p => p.maps && p.maps.length);
     const weights = itemWeights(merchant, profiles);
     // Mystery Cargo pools are mixed (items of different categories); cargo named after a category
-    // ("Tools", "Paper"…) holds a single category, and reds never drop from it
+    // ("Tools", "Paper"…) holds a single category (reds are rare there, but some have them, see pools)
     const catOf = new Map(merchant.items.map(it => [it.id, it.category]));
     const mixed = pl => new Set(pl.items.map(([id]) => catOf.get(id))).size > 1;
     const weightsMix = itemWeights(merchant, profiles, mixed);
@@ -46,7 +46,8 @@ const Library = (() => {
           nameEn: en,
           q: RARITY[m.rarity || gi.rarity] || 'white',
           size: m.size || gi.size || '',
-          price: m.ref || 0,
+          price: m.ref || 0,        // approximate market price
+          contact: m.contact || 0,  // price when handed in to a trader
           category: m.category || '',
           w: avg(wp),
           wp,
@@ -73,10 +74,12 @@ const Library = (() => {
       const nameEn = [...items].sort((a, b) => b.w - a.w).slice(0, 3).map(it => it.nameEn).join(', ');
       sounds.push({ id: 'lib:' + g.id, lib: true, name: g.title || g.id, nameEn, up, down, dur: +dur.toFixed(2), items });
     }
-    // Merchant pools (for the tooltip price): price, weight, whether it is Mystery Cargo, items with weights
+    // Merchant pools: the cargo label the merchant shows, price, size, weight in the profile, items with weights.
+    // Every pool holds items of one size, so label + price + size pick the pool of a cargo.
     const liveIds = new Set(profiles.map(p => p.id));
     const pools = merchant.pools.filter(pl => liveIds.has(pl.profile)).map(pl => ({
-      profile: pl.profile, price: pl.price, weight: pl.weight, mixed: mixed(pl),
+      profile: pl.profile, price: pl.price, weight: pl.weight, mixed: mixed(pl), label: pl.label || '',
+      size: (byId.get(pl.items[0][0]) || {}).size || '',
       categories: [...new Set(pl.items.map(([id]) => catOf.get(id)))],
       items: pl.items.map(([id, w]) => [id, w]),
     }));
