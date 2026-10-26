@@ -71,12 +71,19 @@
 
   .lang { margin-left: auto; }
   /* overlay window (one monitor): the result card and the map float above the game */
-  .overlay { padding: 8px; }
+  .overlay { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 0.95fr); gap: 8px; height: 100vh; box-sizing: border-box; }
+  .overlay .ov-map, .overlay .ov-side { min-height: 0; overflow: auto; }
+  .overlay .ov-side { display: flex; flex-direction: column; gap: 8px; }
+  .overlay .ov-side > * { flex: none; } /* the column scrolls; its blocks keep their height */
+  .overlay .stage { padding: 6px 8px; flex-wrap: wrap; gap: 6px; }
+  .overlay .stage .grow { display: none; }
   .overlay #result { padding: 10px; min-height: 0; }
-  .overlay #result .big { font-size: 28px; }
-  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; }
-  .overlay .tile img { width: 48px; height: 48px; }
-  .overlay .map-wrap { max-height: none; margin-top: 8px; }
+  .overlay #result .big { font-size: 22px; }
+  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
+  .overlay .tile img { width: 40px; height: 40px; }
+  .overlay .map-wrap { max-height: none; margin-top: 0; }
+  .overlay .rank { margin-top: 0; font-size: 12px; }
+  .overlay .rank .row { flex-wrap: wrap; gap: 4px 8px; }
   .update { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #3b82f6; color: #93c5fd; text-decoration: none; font-size: 13px; }
   .update:hover { background: rgba(59, 130, 246, .15); }
   .update:not([hidden]) + .lang { margin-left: 0; }
@@ -285,6 +292,8 @@ const PAYBACK_BUY = 0.05;    // mean value at least +5% over the price: "worth b
 const PAYBACK_RISK = -0.15;  // down to −15%: "a gamble", below: "skip"
 const BUY_LIMIT = 2;         // mystery cargo purchases per raid: the best this many are marked on the map
 const CATEGORY_RED_MIN = 0.005; // a category cargo is highlighted (not dimmed) from this red chance
+const STALE_SHARE = 0.4;     // this share of the visible cargo clashing with a ready map means the list changed
+const STALE_PARSES = 4;      // for this many parses in a row
 const VALUE_KEY = 'abi-kaluvan-value-v1'; // value basis for payback (VALUE_BASES)
 const VALUE_BASES = ['contact', 'merchant', 'market']; // see itemValue
 const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
@@ -378,6 +387,7 @@ let phase = 'scan';          // 'scan' — building the map, 'frozen' — the ma
 let frozenPlaced = null;     // the ready map: the fixed list of cargo
 let sawTop = false, sawEnd = false; // whether the top and the bottom of the list were seen during the scan
 let stableCount = 0;         // how many parses in a row had no new cargo
+let staleCount = 0;          // how many parses in a row a ready map clashed with the visible list
 let sbKnown = null;          // the scrollbar track found { x, trackTop, trackLen }
 let noBarCount = 0;          // how many parses the grid is visible but the scrollbar is not
 let thumbOddLen = 0, thumbOddCount = 0; // a thumb of a different length: which and for how many frames in a row
@@ -834,7 +844,8 @@ function resetScan() {
   P = 0; checkFrames = 0; offset = 0; viewport = null; prevSig = null; ring = []; listTopR = null;
   cargo = new Map(); results = new Map(); lastKey = null; lastSeen = null; gridSeenAt = 0;
   phase = 'scan'; sawTop = false; sawEnd = false; stableCount = 0;
-  sbKnown = null; noBarCount = 0; frozenPlaced = null;
+  sbKnown = null; noBarCount = 0; frozenPlaced = null; staleCount = 0;
+  lastScan = 0; // the next frame is parsed at once
   updateStage();
   drawMap();
 }
@@ -921,10 +932,10 @@ function onVideoFrame(src, fw, fh) {
   // only drift the offset and fill the ring with unrelated frames
   const merchantNear = viewport && now - gridSeenAt < GRID_STALE_MS;
   if (merchantNear) track(src, rp, now);
-  // Without the merchant the parse runs rarely. The next one is never sooner than 1.5× the last parse took,
+  // Without the merchant the parse runs rarely. The next one is never sooner than 1.2× the last parse took,
   // so a slow parse cannot occupy the main thread back to back.
   const every = !gridSeenAt || now - gridSeenAt > GRID_IDLE_MS ? SCAN_IDLE_MS : phase === 'scan' ? SCAN_FAST_MS : SCAN_MS;
-  if (now - lastScan >= Math.max(every, parseCost * 1.5)) {
+  if (now - lastScan >= Math.max(every, parseCost * 1.2)) {
     lastScan = now;
     analyze(src, rp);
     parseCost = performance.now() - now;
@@ -1100,6 +1111,17 @@ function analyze(src, rp) {
     // A frozen map ignores the mouse, price tooltips and purchases: after a purchase
     // the player presses "Scan again". Otherwise a tooltip hanging over cargo would break the map.
     const frozenKeys = new Set(frozenPlaced.map(([k]) => k));
+    // The list changed under a ready map (a purchase, a new merchant stock): most visible cargo then clash with
+    // the map. A few parses in a row like that, and the map is built anew, without "Scan again".
+    let clash = 0;
+    for (const [key, it] of itemOf) {
+      if (frozenKeys.has(key)) continue;
+      const [C, R] = key.split(',').map(Number);
+      if (overlapsFrozen({ C, R, w: it.w, h: it.h })) clash++;
+    }
+    if (items.length >= 3 && clash >= Math.max(2, items.length * STALE_SHARE)) {
+      if (++staleCount >= STALE_PARSES) { log(tr('log.listChanged')); resetScan(); updateStage(); if (mapVisible()) drawMap(); return; }
+    } else staleCount = 0;
     // Filling in: a missing cargo (say, the top row did not get confirmed before freezing)
     // is added once it has been seen confidently several times and overlaps nothing known.
     // Existing cargo of a ready map never change.
@@ -1437,6 +1459,15 @@ function detectHover(frame) {
   const sig = changed.map(r => `${r.C},${r.R}`).sort().join(';');
   if (sig === hoverSig) return; // this tooltip was already read
   hoverSig = sig;
+  // Right away, before the tooltip is read (that takes Tesseract a fraction of a second): the tooltip opens below
+  // and to the right of the cursor, so the hovered cargo is the top-left one of those it changed. It is outlined
+  // and gets the next sound at once; the read below confirms it or moves it.
+  const guess = changed.slice().sort((a, b) => a.R - b.R || a.C - b.C)[0];
+  const guessEntry = guess && placedCargo().find(([, r]) => r === guess);
+  if (guessEntry) {
+    hover = { key: guessEntry[0], t: performance.now(), guess: true };
+    if (mapVisible()) drawMap();
+  }
   // rectangle of the changed cargo in the frame (with a margin)
   const off = offset, px0 = phaseX;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -1484,7 +1515,7 @@ function showHover(rec) {
   const color = red === null ? '#8b93a1' : redColor(red);
   ui.result.style.borderColor = color;
   ui.result.style.background = color + '1a';
-  const title = red === null ? tr('hover.title') : red >= 0.995 ? tr('card.red') : red > 0 ? tr('hover.maybe', { p: pct(red) }) : tr('hover.none');
+  const title = red === null ? tr('hover.title') : red >= 0.995 ? tr('card.red') : red > 0 ? tr('hover.maybe', { p: pctFine(red) }) : tr('hover.none');
   ui.result.innerHTML = `
     <div class="big" style="color:${color}">${title}</div>
     <div class="sub">${esc(cargoHead(rec))}. ${esc(tr('hover.drag'))}</div>
@@ -2289,7 +2320,7 @@ async function openOverlay() {
   if (overlayWin) return;
   if (!('documentPictureInPicture' in window)) { log(tr('log.noPip')); return; }
   let w;
-  try { w = await documentPictureInPicture.requestWindow({ width: 380, height: 600 }); }
+  try { w = await documentPictureInPicture.requestWindow({ width: 640, height: 560 }); }
   catch { log(tr('log.noPip')); return; }
   overlayWin = w;
   for (const ss of document.styleSheets) {
@@ -2300,13 +2331,18 @@ async function openOverlay() {
     } catch {}
   }
   w.document.title = tr('app');
+  // Two columns, everything visible without scrolling: the map on the left, on the right the stage
+  // (with "Scan again"), the result card with chances and payback, and the best buys
   const box = w.document.createElement('div');
   box.className = 'overlay';
+  const left = w.document.createElement('div'), right = w.document.createElement('div');
+  left.className = 'ov-map'; right.className = 'ov-side';
+  box.append(left, right);
   w.document.body.append(box);
-  overlayParts = [ui.result, $('mapWrap')].map(el => {
+  overlayParts = [[$('mapWrap'), left], [document.querySelector('.stage'), right], [ui.result, right], [ui.rank, right]].map(([el, to]) => {
     const ph = document.createComment('overlay');
     el.replaceWith(ph);
-    box.append(el);
+    to.append(el);
     return { el, ph };
   });
   w.addEventListener('pagehide', () => {
