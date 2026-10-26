@@ -65,13 +65,19 @@ const Vision = (() => {
       }
       H[y] /= w;
     }
-    for (let x = 0; x < w; x++) {
-      let run = 0;
-      for (let y = 0; y <= h; y++) {
-        if (y < h && vr[y * w + x]) { run++; continue; }
-        if (run >= minRun) V[x] += run;
-        run = 0;
+    // columns are walked row by row with a run counter per column: the same result, but memory is read in order
+    // (column by column every read missed the cache on a large frame)
+    const run = new Int32Array(w);
+    for (let y = 0; y < h; y++) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        if (vr[row + x]) { run[x]++; continue; }
+        if (run[x] >= minRun) V[x] += run[x];
+        run[x] = 0;
       }
+    }
+    for (let x = 0; x < w; x++) {
+      if (run[x] >= minRun) V[x] += run[x];
       V[x] /= h;
     }
     return { H: maxFilter(H), V: maxFilter(V) };

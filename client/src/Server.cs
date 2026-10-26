@@ -110,12 +110,24 @@ namespace AbiKaluvan.Client
             catch { }
         }
 
+        // A page that stopped reading (a frozen tab) must not stall the sender: the audio capture thread would stop
+        // and the game sound would be lost. After SEND_TIMEOUT_MS such a page is dropped, it reconnects by itself.
+        const int SEND_TIMEOUT_MS = 1000;
         static void Send(WebSocket ws, byte[] data, WebSocketMessageType type)
         {
             lock (ws)
             {
-                try { ws.SendAsync(new ArraySegment<byte>(data), type, true, CancellationToken.None).Wait(); }
-                catch { lock (clients) clients.Remove(ws); lock (screenClients) screenClients.Remove(ws); }
+                try
+                {
+                    using (var cts = new CancellationTokenSource(SEND_TIMEOUT_MS))
+                        ws.SendAsync(new ArraySegment<byte>(data), type, true, cts.Token).GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    try { ws.Abort(); } catch { }
+                    lock (clients) clients.Remove(ws);
+                    lock (screenClients) screenClients.Remove(ws);
+                }
             }
         }
 

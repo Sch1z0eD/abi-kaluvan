@@ -39,7 +39,6 @@
   .muted { color: var(--muted); }
   .help li { margin-bottom: 6px; }
   input[type=range] { width: 140px; }
-  .diag-view { display: block; width: 100%; max-width: 480px; height: auto; background: #000; border-radius: 6px; }
   #log { max-height: 180px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* Steps */
@@ -168,17 +167,6 @@
       <h2 data-i18n="h.log">Log</h2>
       <div id="log"></div>
     </section>
-
-    <section>
-      <h2 data-i18n="h.diag">What the site sees</h2>
-      <canvas id="diagView" class="diag-view" width="320" height="180"></canvas>
-      <p class="muted" id="diagInfo" style="margin:6px 0 0"></p>
-      <div class="row" style="margin-top:10px">
-        <button id="btnSaveFrame" data-i18n="btn.saveFrame">Save frame</button>
-        <button id="btnTestImg" data-i18n="btn.testImg">Test a screenshot</button>
-        <input type="file" id="testImg" accept="image/*" hidden>
-      </div>
-    </section>
   </div>
 
   <div>
@@ -244,6 +232,10 @@ const RED_MIN = 3;           // minimal "redness" of the trace where a cargo was
 const MAP_U = 56;            // map unit size
 const SCAN_MS = 150;         // how often to parse the grid once the map is ready (price tooltips are noticed sooner)
 const SCAN_FAST_MS = 45;     // and during the scan: every cargo must collect its votes while visible
+const SCAN_IDLE_MS = 400;    // and with no merchant on screen for a while
+const GRID_STALE_MS = 1500;  // the grid was not seen for longer: no scroll tracking
+const GRID_IDLE_MS = 3000;   // and for longer still: rare parses
+const THUMB_MS = 1000;       // a cargo picture for the map is refreshed at most this often
 const QUIET_MS = 1500;       // for this long after a sound the picture is "dirty" (a cargo is being dragged)
 const REOPEN_MS = 5000;      // grid not seen for longer during a scan: the merchant was closed, scan again
 const FREEZE_STABLE = 3;     // this many parses without new cargo, and the map is ready
@@ -276,6 +268,7 @@ const MYSTERY_TIERS = {
   common: { short: 'Mystery', tiny: 'Myst', name: 'Mystery Cargo', color: '#d1d5db' },
 };
 const LABEL_TRIES = 4;       // attempts to read a cargo label
+const LABEL_RETRY_MS = 700;  // no sooner than this after the previous attempt
 const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
 const PRICE_MATCH_LOG = 0.25; // the tooltip price must be close to the pool price (in log scale, ≈ ±28%)
 const HOVER_DIFF = 12;       // a cargo changed more than this: the price tooltip covered it
@@ -317,7 +310,6 @@ const ui = {
   sens: $('sens'), sensVal: $('sensVal'), thr: $('thr'), thrVal: $('thrVal'), beep: $('beep'),
   map: $('map'), imgFile: $('imgFile'), profile: $('profile'), libDir: $('libDir'),
   stageTitle: $('stageTitle'), stageHint: $('stageHint'), rescan: $('btnRescan'), done: $('btnDone'),
-  diagView: $('diagView'), diagInfo: $('diagInfo'), saveFrame: $('btnSaveFrame'), testImgBtn: $('btnTestImg'), testImg: $('testImg'),
 };
 const specCtx = ui.spec.getContext('2d');
 const mapCtx = ui.map.getContext('2d');
@@ -372,6 +364,7 @@ let noBarCount = 0;          // how many parses the grid is visible but the scro
 let thumbOddLen = 0, thumbOddCount = 0; // a thumb of a different length: which and for how many frames in a row
 let videoReader = null, videoTimer = null;
 let lastScan = 0;
+let parseCost = 0;           // how long the last parse took, ms
 let imgTarget = null;        // { sound, index } the item a picture is being chosen for
 
 const fullCanvas = document.createElement('canvas');
@@ -447,7 +440,7 @@ async function start() {
   if (gameWs) {
     gameWs.onmessage = e => {
       if (typeof e.data === 'string') showGameStatus(JSON.parse(e.data));
-      else if (detector) detector.push(new Float32Array(e.data));
+      else if (detector && !(e.data.byteLength & 3)) detector.push(new Float32Array(e.data));
     };
     gameWs.onclose = () => { if (stream) { gameWs = null; setStatus(tr('status.audioClosed')); } };
     showGameStatus(gameStatus);
@@ -840,13 +833,12 @@ function regionPx(w, h) {
 }
 
 // ---------- Grid diagnostics ----------
-// What the site gets and why the grid is not found: frame size, a preview of the searched area,
-// and every DIAG_MS a short report while there is no grid. "Save frame" downloads the whole frame as PNG.
+// What the site gets and why the grid is not found: the frame size once, and every DIAG_MS a short report
+// while there is no grid
 const DIAG_MS = 5000;
-const DIAG_VIEW_MS = 1000;
-const diag = { w: 0, h: 0, src: '', noPeriod: 0, noGrid: 0, ok: 0, since: 0, viewAt: 0, save: false };
+const diag = { w: 0, h: 0, src: '', noPeriod: 0, noGrid: 0, ok: 0, since: 0 };
 
-function diagFrame(src, fw, fh, rp) {
+function diagFrame(fw, fh, rp) {
   const kind = frameCropped ? 'client' : 'browser';
   if (fw !== diag.w || fh !== diag.h || kind !== diag.src) {
     Object.assign(diag, { w: fw, h: fh, src: kind, noPeriod: 0, noGrid: 0, ok: 0, since: performance.now() });
@@ -855,38 +847,11 @@ function diagFrame(src, fw, fh, rp) {
     const screenW = Math.round(screen.width * devicePixelRatio);
     if (!frameCropped && stream && fw < screenW * 0.9) log(tr('log.frameSmall', { w: fw, sw: screenW }));
   }
-  if (diag.save) {
-    diag.save = false;
-    const c = document.createElement('canvas');
-    c.width = fw; c.height = fh;
-    c.getContext('2d').drawImage(src, 0, 0, fw, fh);
-    c.toBlob(b => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b);
-      a.download = `abi-frame-${fw}x${fh}-${Date.now()}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      log(tr('log.frameSaved', { w: fw, h: fh }));
-    }, 'image/png');
-  }
 }
 
 // outcome: 'noPeriod' — no cell lines at all, 'noGrid' — a cell size but no grid, 'ok'
 function diagParse(outcome, now) {
   diag[outcome]++;
-  if (now - diag.viewAt >= DIAG_VIEW_MS) {
-    diag.viewAt = now;
-    const v = ui.diagView, s = Math.min(1, 480 / fullCanvas.width);
-    const w = Math.max(1, Math.round(fullCanvas.width * s)), h = Math.max(1, Math.round(fullCanvas.height * s));
-    if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
-    const c = v.getContext('2d');
-    c.drawImage(fullCanvas, 0, 0, w, h);
-    if (viewport && P) {
-      c.strokeStyle = '#22c55e'; c.lineWidth = 2;
-      c.strokeRect(viewport.x * s, viewport.y * s, viewport.w * s, viewport.h * s);
-    }
-    ui.diagInfo.textContent = tr('diag.info', { w: diag.w, h: diag.h, p: P ? P.toFixed(1) : '—', n: placedCargo().length });
-  }
   if (now - diag.since < DIAG_MS) return;
   if (!diag.ok) {
     if (diag.noGrid) log(tr('log.gridNoGrid', { p: P.toFixed(1), n: diag.noGrid }));
@@ -896,7 +861,8 @@ function diagParse(outcome, now) {
   diag.since = now;
 }
 
-// A screenshot of the game (the whole window) instead of the live picture: the same parse, a few dozen times
+// For debugging from the browser console: a screenshot of the game (the whole window) instead of the live
+// picture, the same parse a few dozen times. testScreenshot(await (await fetch('frame.png')).blob())
 async function testScreenshot(file) {
   const bmp = await createImageBitmap(file);
   const keepCropped = frameCropped;
@@ -915,9 +881,19 @@ async function testScreenshot(file) {
 function onVideoFrame(src, fw, fh) {
   const now = performance.now();
   const rp = regionPx(fw, fh);
-  diagFrame(src, fw, fh, rp);
-  if (viewport) track(src, rp, now);
-  if (now - lastScan >= (phase === 'scan' ? SCAN_FAST_MS : SCAN_MS)) { lastScan = now; analyze(src, rp); }
+  diagFrame(fw, fh, rp);
+  // The small tracking frame only while the merchant is on screen: in a raid or with the merchant closed it would
+  // only drift the offset and fill the ring with unrelated frames
+  const merchantNear = viewport && now - gridSeenAt < GRID_STALE_MS;
+  if (merchantNear) track(src, rp, now);
+  // Without the merchant the parse runs rarely. The next one is never sooner than 1.5× the last parse took,
+  // so a slow parse cannot occupy the main thread back to back.
+  const every = !gridSeenAt || now - gridSeenAt > GRID_IDLE_MS ? SCAN_IDLE_MS : phase === 'scan' ? SCAN_FAST_MS : SCAN_MS;
+  if (now - lastScan >= Math.max(every, parseCost * 1.5)) {
+    lastScan = now;
+    analyze(src, rp);
+    parseCost = performance.now() - now;
+  }
 }
 
 // A small frame of the visible part of the grid: for scroll tracking and for finding a dragged cargo
@@ -1030,6 +1006,7 @@ function analyze(src, rp) {
   if (!viewport || (sb && (Math.abs(viewport.y - vpNew.y) > 3 || Math.abs(viewport.h - vpNew.h) > 3))) {
     viewport = vpNew;
     phaseX = grid.x0 % P;
+    prevSig = null; ring = []; // the small frames of the old area would give a false scroll shift
   } else if (!sb && grid.y0 + grid.rows * P > viewport.y + viewport.h + P / 2) {
     viewport.h = Math.round(grid.y0 + grid.rows * P - viewport.y);
   }
@@ -1063,10 +1040,11 @@ function analyze(src, rp) {
 
   // while a cargo is dragged the picture is "dirty": the map and the references are left alone
   const quiet = now - captureOnset > QUIET_MS;
-  const seen = new Set(), fresh = [];
+  const seen = new Set(), fresh = [], itemOf = new Map();
   for (const it of items) {
     const C = colOf(it.c), R = n + it.r;
     const key = `${C},${R},${it.w},${it.h}`;
+    itemOf.set(key, it);
     const rec = cargo.get(key);
     if (rec) seen.add(key);
     else fresh.push({ key, C, R, it });
@@ -1102,16 +1080,19 @@ function analyze(src, rp) {
     }
   }
 
+  const frozenNow = phase === 'frozen' && new Set(frozenPlaced.map(([k]) => k));
   for (const key of seen) {
     const rec = cargo.get(key);
-    const it = items.find(i => `${colOf(i.c)},${n + i.r},${i.w},${i.h}` === key);
+    const it = itemOf.get(key);
     rec.votes++;
     rec.seen = now;
     if (!quiet && rec.thumb) continue;
     const x = grid.x0 + it.c * P, y = grid.y0 + it.r * P;
-    rec.thumb = makeThumb(x, y, it.w * P, it.h * P);
+    // the picture for the map: redrawn into the same canvas, at most once per THUMB_MS
+    if (!rec.thumb || now - (rec.thumbAt || 0) >= THUMB_MS) { rec.thumb = makeThumb(x, y, it.w * P, it.h * P, rec.thumb); rec.thumbAt = now; }
     updateReveal(rec, Vision.meanColor(rgba, rp.w, x + P * 0.1, y + P * 0.3, it.w * P - P * 0.2, it.h * P - P * 0.4));
-    if (quiet) readLabel(rec, x, y, it.w * P, it.h * P);
+    // labels only for confirmed cargo (on a ready map: only for its own cargo), not for one-frame junk
+    if (quiet && rec.votes >= MIN_VOTES && (!frozenNow || frozenNow.has(key))) readLabel(rec, x, y, it.w * P, it.h * P, now);
   }
   // appearance reference of the visible cargo, for finding the dragged one
   const last = ring[ring.length - 1];
@@ -1128,7 +1109,7 @@ function analyze(src, rp) {
   }
   if (phase === 'frozen' && quiet && last) detectHover(last);
   updateStage();
-  if (document.visibilityState === 'visible') drawMap();
+  if (mapVisible()) drawMap();
 }
 
 function overlapsFrozen(rec) {
@@ -1198,9 +1179,10 @@ function relocate(items, colOf, n) {
   return bestS >= Math.max(4, items.length * 0.75) ? best : n;
 }
 
-function makeThumb(x, y, w, h) {
-  const c = document.createElement('canvas');
-  c.width = Math.round(w / P * MAP_U); c.height = Math.round(h / P * MAP_U);
+function makeThumb(x, y, w, h, reuse) {
+  const cw = Math.round(w / P * MAP_U), ch = Math.round(h / P * MAP_U);
+  const c = reuse && reuse.width === cw && reuse.height === ch ? reuse : document.createElement('canvas');
+  c.width = cw; c.height = ch;
   c.getContext('2d').drawImage(fullCanvas, x, y, w, h, 0, 0, c.width, c.height);
   return c;
 }
@@ -1400,7 +1382,7 @@ function detectHover(frame) {
     if (tip.label && !rec.label) rec.label = tip.label;
     hover = { key, t: performance.now() };
     showHover(rec);
-    if (document.visibilityState === 'visible') drawMap();
+    if (mapVisible()) drawMap();
   }).catch(() => { hoverSig = ''; }).finally(() => { hoverBusy = false; });
 }
 
@@ -1427,8 +1409,11 @@ function cargoHead(rec) {
 }
 
 // Read the cargo label (asynchronously, with Tesseract). Crop now, as the frame will change.
-function readLabel(rec, x, y, w, h) {
+function readLabel(rec, x, y, w, h, now) {
   if (rec.label || rec.labelBusy || (rec.labelTries || 0) >= LABEL_TRIES || typeof Ocr === 'undefined') return;
+  // a failed read is retried on a different frame, not on the next almost identical one
+  if (now - (rec.labelAt || -Infinity) < LABEL_RETRY_MS) return;
+  rec.labelAt = now;
   rec.labelBusy = true;
   const crop = Ocr.labelCanvas(fullCanvas, x, y, w, h, P);
   readLabel.n = (readLabel.n || 0) + 1;
@@ -1436,7 +1421,7 @@ function readLabel(rec, x, y, w, h) {
     .then(text => {
       rec.labelTries = (rec.labelTries || 0) + 1;
       const label = Ocr.parseLabel(text);
-      if (label) { rec.label = label; if (document.visibilityState === 'visible') drawMap(); }
+      if (label) { rec.label = label; if (mapVisible()) drawMap(); }
     })
     .catch(e => { rec.labelTries = LABEL_TRIES; if (!readLabel.failed) log(tr('log.ocrFail', { msg: e.message || e })); readLabel.failed = true; })
     .finally(() => { rec.labelBusy = false; });
@@ -1466,7 +1451,7 @@ function readFeed(G, grid, now) {
   if (fs) feedSig = fs;
   if (bs) balanceSig = bs;
   feedBusy = true;
-  const read = r => Ocr.readData(Ocr.tipCanvas(fullCanvas, r.x, r.y, r.w, r.h, P), 'label').then(d => d.text);
+  const read = r => Ocr.readData(Ocr.tipCanvas(fullCanvas, r.x, r.y, r.w, r.h, P), 'feed').then(d => d.text); // own reader: labels queued during a scan would delay purchase detection
   // the balance first: the purchase line and the balance drop usually appear together
   (bs ? read(balR).then(t => { const v = Ocr.parseBalance(t); if (v) onBalance(v); }) : Promise.resolve())
     .then(() => fs ? read(feedR).then(t => { const f = Ocr.parseFeed(t); if (f) onFeed(f); }) : null)
@@ -1587,6 +1572,10 @@ function updateStage() {
 }
 
 // ---------- Map drawing ----------
+// The map is seen either on the page or in the overlay window: in overlay mode the page tab is usually
+// hidden behind the game, but the map in the overlay must keep updating
+const mapVisible = () => document.visibilityState === 'visible' || !!overlayWin;
+
 function drawMap() {
   try { drawMapInner(); }
   catch (e) {
@@ -2013,16 +2002,6 @@ function log(s) {
 
 // ---------- Events ----------
 ui.start.onclick = start;
-ui.saveFrame.onclick = () => {
-  if (!diag.w) { log(tr('log.noFrame')); return; }
-  diag.save = true;
-};
-ui.testImgBtn.onclick = () => ui.testImg.click();
-ui.testImg.onchange = e => {
-  const f = e.target.files[0];
-  e.target.value = '';
-  if (f) testScreenshot(f).catch(err => log(tr('log.video', { msg: err.message })));
-};
 ui.stop.onclick = stop;
 ui.rescan.onclick = resetScan;
 ui.done.onclick = () => freeze(tr('log.manualFreeze', { n: placedCargo().length }));

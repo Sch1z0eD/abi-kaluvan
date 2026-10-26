@@ -23,6 +23,8 @@ const Ear = (() => {
   const MIN_W = 0.03;          // a band with a smaller share of the template energy is ignored
   const BLOCK = 240;           // 10 ms at 24 kHz: step of the sound start search
   const RETRIGGER_SEC = 0.12;  // a new sound not earlier than this
+  const ATTACK_BLOCKS = 3;     // a sound start is compared with the level this many blocks (30 ms) earlier
+  const ATTACK_SHARE = 0.5;    // and must rise by at least this share of the sensitivity in that time
   const MIN_LEVEL_DB = -62;    // quieter sounds are ignored
   const RING_SEC = 3;
   const DEFAULT_THRESHOLD = 0.5;
@@ -216,7 +218,9 @@ const Ear = (() => {
     // The sound start is searched in every band separately: a ringing metal sound is visible up high even when
     // the bottom is flooded with music or voice
     const blockE = BANDS.map(() => 0), floor = BANDS.map(() => null);
-    let blockN = 0, lastTrig = -Infinity;
+    // the last ATTACK_BLOCKS block levels of every band: a sound start must also be a sharp rise against them
+    const past = BANDS.map(() => new Float32Array(ATTACK_BLOCKS).fill(-200));
+    let blockN = 0, lastTrig = -Infinity, blockNo = 0;
     const pending = [];             // samples (24 kHz) where a sound started and we wait for its tail
 
     function slice(buf, len, end, n) {
@@ -242,10 +246,14 @@ const Ear = (() => {
             blockE[b] = 0;
             level = Math.max(level, db);
             if (floor[b] === null) floor[b] = db;
-            if (ready && db > floor[b] + sens && db > MIN_LEVEL_DB) trig = true;
+            // A pick-up sound jumps up within a block or two, while a gust of wind or a music swell grows
+            // over hundreds of ms: those lift the level above the background too, but slowly, and are not taken
+            const rise = db - past[b][blockNo % ATTACK_BLOCKS];
+            past[b][blockNo % ATTACK_BLOCKS] = db;
+            if (ready && db > floor[b] + sens && rise > sens * ATTACK_SHARE && db > MIN_LEVEL_DB) trig = true;
             else floor[b] += (db - floor[b]) * (db < floor[b] ? 0.2 : 0.01); // background: falls fast, rises slowly
           }
-          blockN = 0;
+          blockN = 0; blockNo++;
           if (trig) { lastTrig = total; pending.push(total - BLOCK); }
           if (opts.onLevel) opts.onLevel(level, trig);
         }

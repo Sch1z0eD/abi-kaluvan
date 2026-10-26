@@ -51,7 +51,8 @@ const Ocr = (() => {
     const l = lane(name);
     const job = l.queue.then(async () => {
       const w = await l.worker;
-      const { data } = await w.recognize(canvas);
+      // only the text and the lines are used: no hOCR and TSV, Tesseract builds them for every call by default
+      const { data } = await w.recognize(canvas, {}, { text: true, blocks: true, hocr: false, tsv: false });
       return data;
     });
     l.queue = job.catch(() => {});
@@ -87,8 +88,11 @@ const Ocr = (() => {
     const d = ctx.getImageData(0, 0, w, h).data;
     const g = new Uint8Array(w * h);
     for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
-    const sorted = Array.from(g).sort((a, b) => a - b);
-    const median = sorted[sorted.length >> 1];
+    // the median brightness from a histogram (sorting the whole patch took several ms)
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < g.length; i++) hist[g[i]]++;
+    let median = 0;
+    for (let acc = 0; median < 255; median++) { acc += hist[median]; if (acc > g.length >> 1) break; }
     const dark = Math.max(8, Math.min(30, median * 0.5)); // the tooltip background is darker than grey cargo
     // 4×4 blocks: "tooltip" ones are mostly dark, with almost no grey (grey is cargo)
     const bw = Math.floor(w / TIP_BLOCK), bh = Math.floor(h / TIP_BLOCK);

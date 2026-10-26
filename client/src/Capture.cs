@@ -83,8 +83,10 @@ namespace AbiKaluvan.Client
         {
             int pid;
             if (exe.StartsWith("pid:") && int.TryParse(exe.Substring(4), out pid)) return Alive(pid) ? pid : 0;
-            foreach (var p in Process.GetProcessesByName(exe)) return p.Id;
-            return 0;
+            // polled every 2 s by two threads: the Process objects are released right away
+            int found = 0;
+            foreach (var p in Process.GetProcessesByName(exe)) { if (found == 0) found = p.Id; p.Dispose(); }
+            return found;
         }
 
         static IAudioClient Activate(int pid)
@@ -260,13 +262,20 @@ namespace AbiKaluvan.Client
             return true;
         }
 
+        // one set of encoder settings for all frames (it holds native memory: a new one per frame was never freed)
+        static readonly System.Drawing.Imaging.EncoderParameters jpegQuality = MakeQuality();
+        static System.Drawing.Imaging.EncoderParameters MakeQuality()
+        {
+            var prm = new System.Drawing.Imaging.EncoderParameters(1);
+            prm.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L);
+            return prm;
+        }
+
         public static byte[] Encode(System.Drawing.Bitmap bmp)
         {
             using (var ms = new MemoryStream())
             {
-                var prm = new System.Drawing.Imaging.EncoderParameters(1);
-                prm.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L);
-                bmp.Save(ms, jpeg, prm);
+                lock (jpegQuality) bmp.Save(ms, jpeg, jpegQuality);
                 return ms.ToArray();
             }
         }
