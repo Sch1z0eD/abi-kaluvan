@@ -1409,13 +1409,19 @@ function onCursor(m) {
 function pickCargo(onset) {
   const frames = ring.filter(f => f.t >= onset - 150 && f.t <= onset + 700);
   if (!frames.length) return null;
+  // red that was there well before the sound (a cargo put in the cart has a red band) is not a fresh trace
+  const before = ring.filter(f => f.t < onset - 300).slice(-3);
   const red = [], gray = [];
   for (const [key, rec] of placedCargo()) {
     if (!rec.base) continue;
-    let r = 0, g = 0;
+    let r = 0, g = 0, r0 = 0;
+    for (const f of before) {
+      const rp = cargoPatch(rec, f, 'red');
+      if (rp) r0 = Math.max(r0, Vision.meanOf(rp) - rec.baseRed);
+    }
     for (const f of frames) {
       const rp = cargoPatch(rec, f, 'red');
-      if (rp) r = Math.max(r, Vision.meanOf(rp) - rec.baseRed);
+      if (rp) r = Math.max(r, Vision.meanOf(rp) - rec.baseRed - r0);
       const gp = cargoPatch(rec, f);
       if (gp && gp.length === rec.base.length) g = Math.max(g, Vision.patchDiff(gp, rec.base));
     }
