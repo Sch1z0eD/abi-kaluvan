@@ -388,6 +388,8 @@ let results = new Map();     // cargo key → { soundId, score }
 let lastKey = null;          // the cargo a sound was just assigned to
 let lastResult = null;
 let lastSeen = null;         // the latest recognition for the preview: { grid, items }
+let lastView = null;         // the visible cargo of the latest full parse: { t, grid, items, keys } (frame px / grid units)
+let viewHistory = [];        // such views of the last CURSOR_KEEP_MS, to look up the cargo at a past moment
 let gridSeenAt = 0;          // when the merchant grid was last seen
 let listTopR = null;         // absolute row of the first list row (the top at first detection)
 let phase = 'scan';          // 'scan' — building the map, 'frozen' — the map is ready and does not change
@@ -897,7 +899,7 @@ function resetScan() {
   P = 0; checkFrames = 0; offset = 0; viewport = null; prevSig = null; ring = []; listTopR = null;
   cargo = new Map(); results = new Map(); lastKey = null; lastSeen = null; gridSeenAt = 0;
   phase = 'scan'; sawTop = false; sawEnd = false; stableCount = 0;
-  sbKnown = null; noBarCount = 0; frozenPlaced = null; staleCount = 0;
+  sbKnown = null; noBarCount = 0; frozenPlaced = null; staleCount = 0; lastView = null; viewHistory = [];
   lastScan = 0; // the next frame is parsed at once
   updateStage();
   drawMap();
@@ -1135,6 +1137,11 @@ function analyze(src, rp) {
   // the header then acts as its top border. Such a cargo is trusted only in the first row of the list.
   items = items.filter(it => Math.abs(grid.y0 + it.r * P - viewport.y) > P * 0.3 || n + it.r === listTopR);
   lastSeen = { grid, items };
+  // What is on screen right now, in frame coordinates, with the map key of every cargo: the map shows this, and
+  // the cargo under the cursor is found here (not through the whole-list map, whose row numbers can drift)
+  lastView = { t: now, grid, items, keys: items.map(it => `${colOf(it.c)},${n + it.r},${it.w},${it.h}`) };
+  viewHistory.push(lastView);
+  while (viewHistory.length > 2 && viewHistory[0].t < now - CURSOR_KEEP_MS) viewHistory.shift();
   readFeed(G, grid, now);
 
   // while a cargo is dragged the picture is "dirty": the map and the references are left alone
@@ -1351,10 +1358,32 @@ function cursorAt(t) {
   return s || cursorTrack[0] || null;
 }
 
-// The cargo under the cursor at time t
+// The cargo at a frame point in the view of time t (the last full parse before it): its map key, or null
+function viewHit(t, x, y) {
+  let v = null;
+  for (const s of viewHistory) { if (s.t <= t) v = s; else break; }
+  v = v || viewHistory[0];
+  if (!v) return null;
+  const { grid } = v, P0 = grid.P;
+  for (let i = 0; i < v.items.length; i++) {
+    const it = v.items[i], x0 = grid.x0 + it.c * P0, y0 = grid.y0 + it.r * P0;
+    if (x >= x0 && x < x0 + it.w * P0 && y >= y0 && y < y0 + it.h * P0) return v.keys[i];
+  }
+  return null;
+}
+
+// The cargo under the cursor at time t: straight from what was on screen then (like MerchantHelper does it,
+// by the cell borders around the cursor), so a drifting row number of the whole-list map cannot spoil it.
+// The cargo record is created if this variant was not stored yet.
 function cursorCargo(t) {
   const p = cursorAt(t);
-  return p && p.in ? cargoAtPoint(p.x, p.y) : null;
+  if (!p || !p.in) return null;
+  const key = viewHit(t, p.x, p.y);
+  if (key && !cargo.has(key)) {
+    const [C, R, w, h] = key.split(',').map(Number);
+    cargo.set(key, { C, R, w, h, votes: 0, base: null, thumb: null });
+  }
+  return key;
 }
 
 // A new cursor position: the cargo under it is the hovered one, outlined at once. Its card (label, chances,
@@ -1365,7 +1394,7 @@ function onCursor(m) {
   cursorTrack.push({ t: now, x: m.x, y: m.y, in: !!m.in });
   while (cursorTrack.length > 2 && cursorTrack[0].t < now - CURSOR_KEEP_MS) cursorTrack.shift();
   if (!viewport || !P) return;
-  const key = m.in ? cargoAtPoint(m.x, m.y) : null;
+  const key = m.in ? cursorCargo(now) : null;
   const prev = hover && hover.cursor ? hover.key : undefined;
   if (key === prev) { if (hover) hover.t = now; return; }
   hover = key ? { key, t: now, cursor: true } : null;
@@ -1611,7 +1640,7 @@ function detectHover(frame) {
     const cx = r.x + (tip.labelBox ? tip.labelBox.x0 - P * 0.25 : tip.priceBox.x0 - P * 0.55);
     const cy = r.y + (tip.labelBox ? tip.labelBox.y0 - P * 0.35 : tip.priceBox.y0 - P * 0.75);
     const C = Math.floor((cx - px0) / P), R = Math.floor((cy + off) / P);
-    const hit = (cursorKey && placedCargo().find(([k]) => k === cursorKey))
+    const hit = (cursorKey && cargo.has(cursorKey) && [cursorKey, cargo.get(cursorKey)])
       || placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
     detectHover.last = { sig, text: data.text, C, R, hit: !!hit, cursor: !!cursorKey }; // for diagnostics
     if (!hit) return;
@@ -1788,8 +1817,20 @@ function cargoName(key) {
   return rec ? `${rec.R + 1 - mapBounds().minR}×${rec.C + 1 - mapBounds().minC}` : key;
 }
 
+// What the map shows: the cargo on screen now (the latest view), each drawn from its record (label, price, sound
+// result) but at its place on screen. Before the first view: the whole-list map.
+function mapEntries() {
+  if (!lastView) return placedCargo();
+  return lastView.items.map((it, i) => {
+    const key = lastView.keys[i], rec = cargo.get(key);
+    const view = rec ? Object.create(rec) : { w: it.w, h: it.h, votes: 0 };
+    view.C = it.c; view.R = it.r;
+    return [key, view];
+  });
+}
+
 function mapBounds() {
-  const placed = placedCargo().map(([, r]) => r);
+  const placed = mapEntries().map(([, r]) => r);
   if (!placed.length) return { minC: 0, minR: 0, maxC: 4, maxR: 3, placed };
   return {
     minC: Math.min(...placed.map(r => r.C)), minR: Math.min(...placed.map(r => r.R)),
@@ -1840,7 +1881,7 @@ function drawMapInner() {
     return;
   }
   const keyOf = new Map(placed.map(r => [r, null]));
-  for (const [key, rec] of placedCargo()) keyOf.set(rec, key);
+  for (const [key, rec] of mapEntries()) keyOf.set(rec, key);
   // the best buys by payback: a "#1", "#2" badge on the map and the list under it
   const ranking = rankCargo();
   const rankOf = new Map(ranking.filter(x => x.pb.verdict !== 'skip').slice(0, BUY_LIMIT).map((x, i) => [x.key, i + 1]));
@@ -1989,8 +2030,9 @@ function drawMapInner() {
   }
   // the mouse cursor (from the client), so it is visible that the map follows it
   const cur = cursorTrack[cursorTrack.length - 1];
-  if (cur && cur.in && viewport && P && cur.y >= viewport.y && cur.y < viewport.y + viewport.h) {
-    const mx = ((cur.x - phaseX) / P - minC) * MAP_U, my = ((cur.y + offset) / P - minR) * MAP_U;
+  if (cur && cur.in && lastView && cur.y >= lastView.grid.y0 && cur.y < lastView.grid.y0 + lastView.grid.rows * lastView.grid.P) {
+    const g = lastView.grid;
+    const mx = ((cur.x - g.x0) / g.P - minC) * MAP_U, my = ((cur.y - g.y0) / g.P - minR) * MAP_U;
     c.fillStyle = '#22d3ee'; c.strokeStyle = '#000'; c.lineWidth = 2;
     c.beginPath(); c.arc(mx, my, 5, 0, Math.PI * 2); c.fill(); c.stroke();
   }
@@ -2389,7 +2431,7 @@ function mapCargoAt(e) {
   const { minC, minR } = mapBounds();
   const p = canvasPos(ui.map, e);
   const C = minC + Math.floor(p.x * ui.map.width / MAP_U), R = minR + Math.floor(p.y * ui.map.height / MAP_U);
-  const hit = placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
+  const hit = mapEntries().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
   return hit ? hit[0] : null;
 }
 ui.map.addEventListener('click', e => {
