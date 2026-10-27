@@ -303,6 +303,8 @@ const HOVER_KEEP_MS = 6000;  // the hovered cargo stays outlined on the map this
 const HOVER_RECENT_MS = 2000; // without the cursor and the red trace, a sound belongs to a cargo hovered this recently
 const CURSOR_KEEP_MS = 3000; // how much cursor history to keep (the sound is matched ~0.35 s after it started)
 const RESULT_HOLD_MS = 4000; // a sound result stays in the card this long before hovering replaces it
+const RECONNECT_MS = 2000;   // a lost client connection is retried this often
+const UNKNOWN_LOG_MS = 5000; // an unrecognized sound is logged at most this often
 const HOVER_MAX_CARGO = 16;  // a tooltip covers at most this many cargo; more is not a tooltip
 const TIP_W = 3.2, TIP_H = 1.8; // price tooltip size in cells (with a margin)
 const BASE_UPDATE_MAX = 6;   // the appearance reference is updated only on small changes (not on a tooltip)
@@ -471,11 +473,7 @@ async function start() {
   });
 
   if (gameWs) {
-    gameWs.onmessage = e => {
-      if (typeof e.data === 'string') showGameStatus(JSON.parse(e.data));
-      else if (detector && !(e.data.byteLength & 3)) detector.push(new Float32Array(e.data));
-    };
-    gameWs.onclose = () => { if (stream) { gameWs = null; setStatus(tr('status.audioClosed')); } };
+    attachGameAudio();
     showGameStatus(gameStatus);
   } else {
     // the same rate as the library, so the samples match exactly
@@ -493,6 +491,34 @@ async function start() {
   ui.start.disabled = true; ui.stop.disabled = false;
   log(tr('log.started', { audio: tr(gameWs ? 'log.audioGame' : 'log.audioAll'), screen: tr(screenWs ? 'log.screenServer' : 'log.screenBrowser') }));
   resetScan();
+}
+
+// Game sound from the client: samples go to the detector. A closed connection (the client restarted, a hiccup)
+// is reconnected by itself while catching is on.
+function attachGameAudio() {
+  gameWs.onmessage = e => {
+    if (typeof e.data === 'string') showGameStatus(JSON.parse(e.data));
+    else if (detector && !(e.data.byteLength & 3)) detector.push(new Float32Array(e.data));
+  };
+  gameWs.onclose = () => {
+    if (!stream) return;
+    gameWs = null;
+    setStatus(tr('status.audioClosed'));
+    reconnect('audio');
+  };
+}
+
+// Tries to get a lost client connection back every RECONNECT_MS while catching is on
+function reconnect(what) {
+  setTimeout(async () => {
+    if (!stream || (what === 'audio' ? gameWs : screenWs)) return;
+    const ws = what === 'audio' ? await connectGameAudio() : await connectScreen();
+    if (!stream) { if (ws) ws.close(); return; }
+    if (!ws) { reconnect(what); return; }
+    if (what === 'audio') { gameWs = ws; attachGameAudio(); showGameStatus(gameStatus); }
+    else { screenWs = ws; startNativeScreen(); }
+    log(tr('log.reconnected'));
+  }, RECONNECT_MS);
 }
 
 // Connects to the game sound from the client on this PC. Returns a WebSocket or null if the client is not running.
@@ -554,7 +580,13 @@ function startNativeScreen() {
       .catch(() => {})
       .finally(() => { busy = false; });
   };
-  screenWs.onclose = () => { cursorTrack = []; if (stream) { screenWs = null; log(tr('log.screenClosed')); } };
+  screenWs.onclose = () => {
+    cursorTrack = [];
+    if (!stream) return;
+    screenWs = null;
+    log(tr('log.screenClosed'));
+    reconnect('screen');
+  };
 }
 
 function closeScreen() {
@@ -653,7 +685,12 @@ function classify(win, onset) {
     return;
   }
   if (score < thr) {
-    log(tr('log.unknown', { name: soundName(best), p: pct(score) }));
+    // unknown sounds are many in a raid (steps, shots, wind): logged only at the merchant and at most every few seconds
+    const atMerchant = cargo.size && performance.now() - gridSeenAt < MERCHANT_FRESH_MS;
+    if (atMerchant && performance.now() - (classify.unknownAt || 0) > UNKNOWN_LOG_MS) {
+      classify.unknownAt = performance.now();
+      log(tr('log.unknown', { name: soundName(best), p: pct(score) }));
+    }
     return;
   }
   if (!best.items.length) {
@@ -1111,6 +1148,27 @@ function analyze(src, rp) {
     else fresh.push({ key, C, R, it });
   }
 
+  // The list changed under the map (a purchase reshuffled it, new merchant stock): most visible cargo then clash with
+  // the map — in the scan phase too, where old cargo with many votes would otherwise keep winning. A few parses in a
+  // row like that, and the map is built anew, without "Scan again". Cargo next to the cursor are not counted:
+  // a price tooltip hanging there breaks their borders for a moment.
+  if (quiet && placedCargo().length) {
+    const placedNow = placedCargo(), placedKeys = new Set(placedNow.map(([k]) => k));
+    const cur = cursorTrack.length && cursorAt(now);
+    const cc = cur && cur.in ? Math.floor((cur.x - phaseX) / P) : null, cr = cur && cur.in ? Math.floor((cur.y + offset) / P) : null;
+    let clash = 0, counted = 0;
+    for (const [key, it] of itemOf) {
+      const [C, R] = key.split(',').map(Number);
+      if (cc !== null && C + it.w > cc && C <= cc + TIP_W + 1 && R + it.h > cr && R <= cr + TIP_H + 1) continue;
+      counted++;
+      if (placedKeys.has(key)) continue;
+      if (placedNow.some(([, r]) => C < r.C + r.w && r.C < C + it.w && R < r.R + r.h && r.R < R + it.h)) clash++;
+    }
+    if (counted >= 3 && clash >= Math.max(2, counted * STALE_SHARE)) {
+      if (++staleCount >= STALE_PARSES) { log(tr('log.listChanged')); resetScan(); return; }
+    } else staleCount = 0;
+  }
+
   if (phase === 'scan' && quiet) {
     // Nothing is deleted during the scan: some cargo borders come and go, and the map would flicker.
     // Disputes between variants are settled by voting (placedCargo), and a reshuffle by a new scan.
@@ -1126,17 +1184,6 @@ function analyze(src, rp) {
     // A frozen map ignores the mouse, price tooltips and purchases: after a purchase
     // the player presses "Scan again". Otherwise a tooltip hanging over cargo would break the map.
     const frozenKeys = new Set(frozenPlaced.map(([k]) => k));
-    // The list changed under a ready map (a purchase, a new merchant stock): most visible cargo then clash with
-    // the map. A few parses in a row like that, and the map is built anew, without "Scan again".
-    let clash = 0;
-    for (const [key, it] of itemOf) {
-      if (frozenKeys.has(key)) continue;
-      const [C, R] = key.split(',').map(Number);
-      if (overlapsFrozen({ C, R, w: it.w, h: it.h })) clash++;
-    }
-    if (items.length >= 3 && clash >= Math.max(2, items.length * STALE_SHARE)) {
-      if (++staleCount >= STALE_PARSES) { log(tr('log.listChanged')); resetScan(); updateStage(); if (mapVisible()) drawMap(); return; }
-    } else staleCount = 0;
     // Filling in: a missing cargo (say, the top row did not get confirmed before freezing)
     // is added once it has been seen confidently several times and overlaps nothing known.
     // Existing cargo of a ready map never change.

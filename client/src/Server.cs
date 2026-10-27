@@ -14,8 +14,8 @@ namespace AbiKaluvan.Client
 {
     public static class Server
     {
-        static readonly List<WebSocket> clients = new List<WebSocket>();
-        static readonly List<WebSocket> screenClients = new List<WebSocket>();
+        static readonly List<Peer> clients = new List<Peer>();        // pages listening to the game sound
+        static readonly List<Peer> screenClients = new List<Peer>();  // pages taking the screen frames
         const int SCREEN_FRAME_MS = 33;  // up to 30 frames per second
         const int BLACK_CHECK_EVERY = 15; // check for a black frame once per this many frames
         static string status = "{\"type\":\"status\",\"state\":\"start\"}";
@@ -77,22 +77,24 @@ namespace AbiKaluvan.Client
 
         static void Audio(HttpListenerContext ctx)
         {
-            var ws = ctx.AcceptWebSocketAsync(null).Result.WebSocket;
-            lock (clients) clients.Add(ws);
-            Send(ws, Encoding.UTF8.GetBytes(status), WebSocketMessageType.Text);
-            WaitClosed(ws);
-            lock (clients) clients.Remove(ws);
-            try { ws.Dispose(); } catch { }
+            var peer = new Peer(ctx.AcceptWebSocketAsync(null).Result.WebSocket);
+            lock (clients) clients.Add(peer);
+            peer.Post(Encoding.UTF8.GetBytes(status), WebSocketMessageType.Text);
+            WaitClosed(peer.Ws);
+            lock (clients) clients.Remove(peer);
+            peer.Close();
         }
 
         static void ScreenSocket(HttpListenerContext ctx)
         {
-            var ws = ctx.AcceptWebSocketAsync(null).Result.WebSocket;
-            lock (screenClients) screenClients.Add(ws);
-            Send(ws, Encoding.UTF8.GetBytes(ScreenStateJson()), WebSocketMessageType.Text);
-            WaitClosed(ws);
-            lock (screenClients) screenClients.Remove(ws);
-            try { ws.Dispose(); } catch { }
+            var peer = new Peer(ctx.AcceptWebSocketAsync(null).Result.WebSocket);
+            lock (screenClients) screenClients.Add(peer);
+            peer.Post(Encoding.UTF8.GetBytes(ScreenStateJson()), WebSocketMessageType.Text);
+            // a new page gets the cursor position at once, not only after the next mouse move
+            if (lastCursor != null) peer.Post(Encoding.UTF8.GetBytes(lastCursor), WebSocketMessageType.Text);
+            WaitClosed(peer.Ws);
+            lock (screenClients) screenClients.Remove(peer);
+            peer.Close();
         }
 
         // the page sends nothing; we read only to notice that it was closed
@@ -110,25 +112,12 @@ namespace AbiKaluvan.Client
             catch { }
         }
 
-        // A page that stopped reading (a frozen tab) must not stall the sender: the audio capture thread would stop
-        // and the game sound would be lost. After SEND_TIMEOUT_MS such a page is dropped, it reconnects by itself.
-        const int SEND_TIMEOUT_MS = 1000;
-        static void Send(WebSocket ws, byte[] data, WebSocketMessageType type)
+        // To every page in a list: each one has its own queue (Peer), nobody waits for a slow page
+        static void Post(List<Peer> list, byte[] data, WebSocketMessageType type, bool latestOnly = false)
         {
-            lock (ws)
-            {
-                try
-                {
-                    using (var cts = new CancellationTokenSource(SEND_TIMEOUT_MS))
-                        ws.SendAsync(new ArraySegment<byte>(data), type, true, cts.Token).GetAwaiter().GetResult();
-                }
-                catch
-                {
-                    try { ws.Abort(); } catch { }
-                    lock (clients) clients.Remove(ws);
-                    lock (screenClients) screenClients.Remove(ws);
-                }
-            }
+            Peer[] peers;
+            lock (list) peers = list.ToArray();
+            foreach (var p in peers) p.Post(data, type, latestOnly);
         }
 
         // Screen frames — only while the page waits for them. Capture and JPEG encoding run in parallel
@@ -140,10 +129,7 @@ namespace AbiKaluvan.Client
         {
             if (state == screenState) return;
             screenState = state;
-            WebSocket[] list;
-            lock (screenClients) list = screenClients.ToArray();
-            var msg = Encoding.UTF8.GetBytes(ScreenStateJson());
-            foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
+            Post(screenClients, Encoding.UTF8.GetBytes(ScreenStateJson()), WebSocketMessageType.Text);
         }
 
         // crop: the frame is already the right part of the window (the merchant is always on the right), the page does not crop again
@@ -206,10 +192,7 @@ namespace AbiKaluvan.Client
             string json = "{\"type\":\"cursor\",\"x\":" + x + ",\"y\":" + y + ",\"in\":" + (inside ? "true" : "false") + "}";
             if (json == lastCursor) return; // the page keeps the last position: an unchanged one is not resent
             lastCursor = json;
-            WebSocket[] list;
-            lock (screenClients) list = screenClients.ToArray();
-            var msg = Encoding.UTF8.GetBytes(json);
-            foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
+            Post(screenClients, Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text);
         }
 
         static void EncodeLoop()
@@ -223,8 +206,6 @@ namespace AbiKaluvan.Client
                 if (bmp == null) continue;
                 try
                 {
-                    WebSocket[] list;
-                    lock (screenClients) list = screenClients.ToArray();
                     if (n++ % BLACK_CHECK_EVERY == 0)
                     {
                         bool black = Screen.IsBlack(bmp);
@@ -232,11 +213,11 @@ namespace AbiKaluvan.Client
                         {
                             wasBlack = black;
                             var msg = Encoding.UTF8.GetBytes("{\"type\":\"screen\",\"black\":" + (black ? "true" : "false") + "}");
-                            foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
+                            Post(screenClients, msg, WebSocketMessageType.Text);
                         }
                     }
                     byte[] frame = Screen.Encode(bmp);
-                    foreach (var ws in list) Send(ws, frame, WebSocketMessageType.Binary);
+                    Post(screenClients, frame, WebSocketMessageType.Binary, true); // only the latest frame waits
                 }
                 catch (Exception e) { Console.WriteLine("screen frame failed: " + e.Message); }
                 finally { bmp.Dispose(); }
@@ -245,9 +226,7 @@ namespace AbiKaluvan.Client
 
         static void Broadcast(byte[] data, WebSocketMessageType type)
         {
-            WebSocket[] list;
-            lock (clients) list = clients.ToArray();
-            foreach (var ws in list) Send(ws, data, type);
+            Post(clients, data, type);
         }
 
         static void SetStatus(string state, int pid, string message)
