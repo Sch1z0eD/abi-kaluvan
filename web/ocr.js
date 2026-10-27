@@ -53,6 +53,8 @@ const Ocr = (() => {
   // Full result: text and lines with words and boxes (bbox in canvas pixels).
   // One job at a time per reader: Tesseract is single-threaded anyway.
   function readData(canvas, name = 'tip') {
+    // an empty crop (a strip at the very edge of the frame): Tesseract would fail on it, nothing to read anyway
+    if (!canvas || canvas.width < 2 || canvas.height < 2) return Promise.resolve({ text: '', lines: [] });
     const l = lane(name);
     const job = l.queue.then(async () => {
       const w = await l.worker;

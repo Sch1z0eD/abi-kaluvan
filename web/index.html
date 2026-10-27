@@ -194,6 +194,11 @@
           <option value="merchant" data-i18n="opt.vMerchant">Value: field merchant +10%</option>
           <option value="market" data-i18n="opt.vMarket">Value: market</option>
         </select>
+        <select id="buysPerRaid" data-i18n-title="tip.buys">
+          <option value="2" data-i18n="opt.buys2">2 buys per raid</option>
+          <option value="3" data-i18n="opt.buys3">3 buys per raid</option>
+          <option value="4" data-i18n="opt.buys4">4 buys per raid</option>
+        </select>
         <input type="file" id="libDir" webkitdirectory hidden>
       </div>
       <div class="row">
@@ -290,7 +295,7 @@ const LABEL_RETRY_MS = 700;  // no sooner than this after the previous attempt
 const SIZE_ALT_MARGIN = 0.1; // a sound that fits the cargo size may be this much weaker than the best one
 const PAYBACK_BUY = 0.05;    // mean value at least +5% over the price: "worth buying"
 const PAYBACK_RISK = -0.15;  // down to −15%: "a gamble", below: "skip"
-const BUY_LIMIT = 2;         // mystery cargo purchases per raid: the best this many are marked on the map
+const BUYS_KEY = 'abi-kaluvan-buys-v1'; // purchases allowed per raid (2, or up to 4 with a levelled character): that many best buys are marked
 const CATEGORY_RED_MIN = 0.005; // a category cargo is highlighted (not dimmed) from this red chance
 const STALE_SHARE = 0.4;     // this share of the visible cargo clashing with a ready map means the list changed
 const STALE_PARSES = 4;      // for this many parses in a row
@@ -361,6 +366,7 @@ let sounds = loadSounds();
 let profiles = loadJson(PROFILES_KEY, []);   // maps from the library: [{ id, name }]
 let profile = loadJson(PROFILE_KEY, '');     // selected map ('' — average over all)
 let includeBlue = loadJson(BLUE_KEY, false); // whether to count blue items
+let buysPerRaid = [2, 3, 4].includes(loadJson(BUYS_KEY, 2)) ? loadJson(BUYS_KEY, 2) : 2; // see BUYS_KEY
 let valueBasis = VALUE_BASES.includes(loadJson(VALUE_KEY, 'contact')) ? loadJson(VALUE_KEY, 'contact') : 'contact';
 let mode = loadJson(MODE_KEY, 'second');     // display mode, see MODE_KEY
 let overlayWin = null, overlayParts = [];    // the overlay window and the elements moved into it
@@ -397,6 +403,7 @@ let frozenPlaced = null;     // the ready map: the fixed list of cargo
 let sawTop = false, sawEnd = false; // whether the top and the bottom of the list were seen during the scan
 let stableCount = 0;         // how many parses in a row had no new cargo
 let staleCount = 0;          // how many parses in a row a ready map clashed with the visible list
+let lastSbTop = true;        // the scrollbar thumb was at the very top on the latest frame
 let sbKnown = null;          // the scrollbar track found { x, trackTop, trackLen }
 let noBarCount = 0;          // how many parses the grid is visible but the scrollbar is not
 let thumbOddLen = 0, thumbOddCount = 0; // a thumb of a different length: which and for how many frames in a row
@@ -905,6 +912,18 @@ function resetScan() {
   drawMap();
 }
 
+// "Scan again" (after a purchase): the merchant list keeps its place, cell size and scrollbar, only the cargo
+// moved. So the grid geometry stays and only the cargo are collected anew: drawing starts on the next frame.
+// The top of the list counts as seen if the list is scrolled to the top right now. (neverh8me/abi-kaluvan@3493071)
+function rescan() {
+  if (!P || !viewport) { resetScan(); return; }
+  cargo = new Map(); results = new Map(); lastKey = null; frozenPlaced = null; hover = null; hoverSig = '';
+  phase = 'scan'; sawTop = !sbKnown || lastSbTop; sawEnd = false; stableCount = 0; checkFrames = 0; staleCount = 0;
+  lastScan = 0;
+  updateStage();
+  drawMap();
+}
+
 function startVideo(track) {
   if ('MediaStreamTrackProcessor' in window) {
     // works even when the tab is in the background, unlike <video> + timers
@@ -1094,6 +1113,7 @@ function analyze(src, rp) {
     else sb = null;
   } else thumbOddCount = 0;
   diag.sb = sb; diag.n = null; // for diagnostics: the scrollbar of this parse and the row number taken
+  if (sb) lastSbTop = sb.thumbTop - sb.trackTop < 2; // for rescan: is the list at its top now
   if (!sb && sbKnown) {
     // The price tooltip covered the scrollbar (a cargo near the right edge). The map is left alone, but the tooltip is still
     // read: while the cursor is on a cargo the list does not scroll, so the position is the last known one.
@@ -1765,16 +1785,38 @@ function processFeed() {
 }
 
 function ownPurchase({ price, item }) {
-  // the cargo with a sound whose tooltip price matches the amount; of several, the one heard last;
-  // if the price was unknown (no hover), the last sound heard within 3 min; otherwise history only
-  const byPrice = [...results].filter(([key]) => {
+  // What dropped is known from the line, so the bought cargo must fit it: its sound holds this item and its size
+  // is the item's size. Many cargo share a price (200k, 250k…) and 1×1 cargo are not on the map at all, so "the last
+  // sound heard" would often be another cargo's sound. Of several fitting cargo with this price the one heard last
+  // is taken; if none fits, the purchase is kept without a sound. (As in neverh8me/abi-kaluvan@bf13689.)
+  const named = [...itemById.values()].map(x => ({ name: x.nameEn || x.name, it: x }));
+  const m = Ocr.matchName(item, named), it = m && m.it;
+  const fits = (key, res) => {
+    const rec = cargo.get(key), s = res && soundById(res.soundId);
+    if (!rec || !s || !it) return false;
+    return s.items.some(x => x.id === it.id) && normSize(`${rec.w}x${rec.h}`) === normSize(it.size);
+  };
+  const byPrice = [...results].filter(([key, res]) => {
     const rec = cargo.get(key);
-    return rec && rec.price && !rec.bought && Math.abs(rec.price - price) <= price * BUY_MATCH;
+    return rec && rec.price && !rec.bought && Math.abs(rec.price - price) <= price * BUY_MATCH && fits(key, res);
   }).sort((a, b) => (b[1].t || 0) - (a[1].t || 0))[0];
   let key = byPrice ? byPrice[0] : null, res = byPrice ? byPrice[1] : null;
-  if (!byPrice && lastResult && Date.now() - lastResult.t < 180e3) { key = lastResult.key; res = lastResult; }
+  // the price was not read (no hover): the last sound heard within 3 min, but only if it fits the item
+  if (!byPrice && lastResult && Date.now() - lastResult.t < 180e3 && lastResult.key && fits(lastResult.key, lastResult)) { key = lastResult.key; res = lastResult; }
   const rec = key && cargo.get(key);
-  recordPurchase({ soundId: res && res.soundId, size: rec ? normSize(`${rec.w}x${rec.h}`) : '', label: cargoInfo(rec), price, itemText: item, key });
+  recordPurchase({ soundId: res && res.soundId, size: rec ? normSize(`${rec.w}x${rec.h}`) : '', label: cargoInfo(rec), price, itemText: item, itemId: it ? it.id : null, key });
+}
+
+// Records from before this check may pair an item with another cargo's sound: such a sound is dropped
+function dropMismatchedSounds() {
+  let changed = false;
+  purchases = purchases.map(b => {
+    const s = b.soundId && soundById(b.soundId);
+    if (!s || b.itemId == null || s.items.some(x => x.id === b.itemId)) return b;
+    changed = true;
+    return { ...b, soundId: null };
+  });
+  if (changed) savePurchases();
 }
 
 // Records a purchase. itemId if the item is already known, otherwise it is looked up by name.
@@ -1886,7 +1928,7 @@ function drawMapInner() {
   for (const [key, rec] of mapEntries()) keyOf.set(rec, key);
   // the best buys by payback: a "#1", "#2" badge on the map and the list under it
   const ranking = rankCargo();
-  const rankOf = new Map(ranking.filter(x => x.pb.verdict !== 'skip').slice(0, BUY_LIMIT).map((x, i) => [x.key, i + 1]));
+  const rankOf = new Map(ranking.filter(x => x.pb.verdict !== 'skip').slice(0, buysPerRaid).map((x, i) => [x.key, i + 1]));
   renderRank(ranking, rankOf);
   const hoverKey = hover && performance.now() - hover.t < HOVER_KEEP_MS ? hover.key : null;
   // Over every cargo: the hovered one is outlined, the best buys get a badge, a known price shows the payback
@@ -2320,6 +2362,7 @@ async function importLibrary(files) {
     itemById = new Map();
     for (const s of sounds) for (const it of s.items) if (it.id) itemById.set(it.id, it);
     profiles = lib.profiles;
+    dropMismatchedSounds();
     try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
     renderProfiles();
     saveSounds();
@@ -2383,7 +2426,7 @@ function log(s) {
 // ---------- Events ----------
 ui.start.onclick = start;
 ui.stop.onclick = stop;
-ui.rescan.onclick = resetScan;
+ui.rescan.onclick = rescan;
 ui.done.onclick = () => freeze(tr('log.manualFreeze', { n: placedCargo().length }));
 
 $('btnLib').onclick = () => ui.libDir.click();
@@ -2403,6 +2446,13 @@ ui.profile.onchange = () => {
   profile = ui.profile.value;
   try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
   renderSounds();
+  drawMap();
+};
+const buysSelect = $('buysPerRaid');
+buysSelect.value = String(buysPerRaid);
+buysSelect.onchange = () => {
+  buysPerRaid = +buysSelect.value || 2;
+  try { localStorage.setItem(BUYS_KEY, JSON.stringify(buysPerRaid)); } catch {}
   drawMap();
 };
 ui.valueBasis.value = valueBasis;
