@@ -11,6 +11,9 @@
     <Version>2.0.0</Version>
     <!-- COM interop for WASAPI process loopback must not be trimmed -->
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- .NET 9+ marks the exe CET-compatible; on Windows without recent updates it then dies at start with
+         "Your Windows doesn't fully support CET" -->
+    <CetCompat>false</CetCompat>
   </PropertyGroup>
 
   <!-- A release is one file: the .NET runtime and the site inside, compressed; nothing to install -->
