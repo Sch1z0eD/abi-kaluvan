@@ -26,23 +26,46 @@ The Field Merchant sells closed cargo: you only see its label, price and size. B
 
 | Part | What it does | Where it runs |
 |---|---|---|
-| [`web/`](web/README.md) | The site: all recognition (grid, text, sound, odds, payback) runs in the browser | Any web server or `localhost` |
-| [`client/`](client/README.md) | A C# client (.NET 10): sound of the game process only, frames of the game window only, the cursor position — over WebSocket | The gaming PC with Windows |
+| [`web/`](web/README.md) | The site: all recognition (grid, text, sound, odds, payback) runs in the browser | Inside `MerchantEar.exe`, or any web server |
+| [`client/`](client/README.md) | A C# app (.NET 10): serves the site, sound of the game process only, frames of the game window only, the cursor position — over WebSocket | The gaming PC with Windows |
 
 ```
-[web server or localhost]  serves web/
-          │ page
-          ▼
-[gaming PC]  browser ──ws://localhost:8777──►  MerchantEar.Client.exe ──► sound and window of UAGame.exe
+[gaming PC]  MerchantEar.exe ──► http://localhost:8777/  (the site, built in)
+                   ▲                       │ page in Chrome or Edge
+                   └─────── ws:// ─────────┘
+             sound and window of UAGame.exe
 ```
 
-The client is optional: without it the site asks you to share the screen with system audio (Chrome or Edge on Windows). With the client the sound is cleaner and the cargo under the cursor is known exactly.
+`MerchantEar.exe` is one file: the site, the client and the .NET runtime inside, nothing to install. The site can also live on its own server; then the exe only streams the sound and picture to it. Without the exe at all the site asks you to share the screen with system audio (Chrome or Edge on Windows); with it the sound is cleaner and the cargo under the cursor is known exactly.
 
 The client does not read or change the game's memory or files: it captures the process sound with the standard Windows mechanism (like OBS and Discord), takes pictures of the game window and reads the system cursor position.
 
-## Quick start
+## Download and run
 
-You need Windows 10 (build 20348+) or 11, the .NET 10 SDK, Python 3 (or any other simple web server) and Chrome or Edge.
+You need Windows 10 (build 20348+) or 11 and Chrome or Edge.
+
+1. Download `MerchantEar.exe` from the [latest release](https://github.com/Sch1z0eD/merchant-ear/releases/latest) and run it. The site opens in the browser at `http://localhost:8777/`; the console window is the client, close it to stop.
+2. Switch the game to Borderless window mode and press **Start catching**.
+3. Open the Field Merchant and scroll through the list — the map builds itself. Hover a cargo to read its price and drag it — the sound tells what is inside.
+
+Windows SmartScreen may warn about an unknown app: the exe is not signed. "More info" → "Run anyway", or build it yourself from the source.
+
+## Build from source
+
+You need the .NET 10 SDK. Run the client with the site built in:
+
+```bash
+cd client
+dotnet run -c Release
+```
+
+The single `MerchantEar.exe`, as in the releases:
+
+```bash
+dotnet publish client -c Release -o publish
+```
+
+To work on the site without rebuilding, serve `web/` separately:
 
 1. Start the client:
 
@@ -58,8 +81,7 @@ You need Windows 10 (build 20348+) or 11, the .NET 10 SDK, Python 3 (or any othe
    python -m http.server 8080
    ```
 
-3. Switch the game to Borderless window mode, open `http://localhost:8080/` and press **Start catching**.
-4. Open the Field Merchant and scroll through the list — the map builds itself. Hover a cargo to read its price and drag it — the sound tells what is inside.
+3. Open `http://localhost:8080/`.
 
 How to put the site on your own server with HTTPS and a password: [web/README.md](web/README.md). Client settings: [client/README.md](client/README.md).
 

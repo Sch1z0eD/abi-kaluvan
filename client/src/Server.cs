@@ -1,6 +1,6 @@
-// Merchant Ear Client server: streams the game sound and the game window to the site over WebSocket.
-// It serves no files: the site lives separately (web/), on any server or on localhost.
-// Only pages from the allowed origins (settings: allowedOrigins) may connect, so a random site
+// Merchant Ear server: serves the site built into the exe (web/) on http://localhost:PORT/ and streams the game
+// sound, the game window and the cursor to it over WebSocket. The site may also live elsewhere (any server);
+// only pages from localhost or the allowed origins (settings: allowedOrigins) may connect, so a random site
 // opened in the same browser cannot get the game picture or sound.
 using System;
 using System.Collections.Generic;
@@ -22,13 +22,14 @@ namespace MerchantEar.Client
         static Settings settings;
 
         // Blocks the thread: serves requests until the window is closed
-        public static void Run(Settings s)
+        public static void Run(Settings s, Action started)
         {
             settings = s;
             Screen.SetProcessDPIAware(); // otherwise only part of the screen is captured at 125% Windows scaling
             var listener = new HttpListener();
             listener.Prefixes.Add("http://localhost:" + s.Port + "/");
             listener.Start();
+            if (started != null) started();
             var t = new Thread(delegate () { CaptureLoop(s.Exe); });
             t.IsBackground = true;
             t.SetApartmentState(ApartmentState.MTA);
@@ -58,6 +59,7 @@ namespace MerchantEar.Client
                 if (path == "/audio" && ctx.Request.IsWebSocketRequest) { Audio(ctx); return; }
                 if (path == "/screen" && ctx.Request.IsWebSocketRequest) { ScreenSocket(ctx); return; }
                 if (path == "/status") { Reply(ctx, 200, status, origin); return; }
+                if (ctx.Request.HttpMethod == "GET" && SiteFiles.Serve(ctx, path)) return;
                 Reply(ctx, 404, "{\"error\":\"not found\"}", origin);
             }
             catch { try { ctx.Response.Abort(); } catch { } }

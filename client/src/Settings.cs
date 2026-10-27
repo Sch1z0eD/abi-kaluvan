@@ -13,6 +13,8 @@ namespace MerchantEar.Client
         public string Exe { get; set; } = "UAGame";
         // Sites allowed to connect, e.g. "https://abi.example.com". Pages on localhost / 127.0.0.1 are always allowed.
         public List<string> AllowedOrigins { get; set; } = new List<string>();
+        // Open the site in the default browser on start
+        public bool OpenBrowser { get; set; } = true;
 
         public static Settings Load(string[] args)
         {
@@ -31,6 +33,7 @@ namespace MerchantEar.Client
                     case "--port": s.Port = int.Parse(next); i++; break;
                     case "--exe": s.Exe = next; i++; break;
                     case "--origin": s.AllowedOrigins.Add(next); i++; break;
+                    case "--no-browser": s.OpenBrowser = false; break;
                 }
             }
             for (int i = 0; i < s.AllowedOrigins.Count; i++) s.AllowedOrigins[i] = s.AllowedOrigins[i].TrimEnd('/');

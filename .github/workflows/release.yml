@@ -1,0 +1,39 @@
+# A v* tag builds the single MerchantEar.exe (site + client + .NET runtime) and publishes it as a GitHub release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || version="0.0.0-dev"
+          dotnet publish client -c Release -o publish -p:Version="$version"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MerchantEar
+          path: publish/MerchantEar.exe
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: publish/MerchantEar.exe
+          generate_release_notes: true
