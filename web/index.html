@@ -6,129 +6,174 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="icon.ico">
 <title>Merchant Ear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link id="fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Saira+Semi+Condensed:wght@500;600;700&display=swap">
 <style>
+  /* Merchant Ear: the look of the in-raid merchant panel. Near-black panels with thin grey slot borders, square
+     corners, condensed caps for headings and numbers, one orange accent (the merchant's Purchase button) and the
+     game's rarity colors for items. Layout: header bar; result card and merchant map side by side; tools below. */
   :root {
-    --bg: #111317; --panel: #1a1d23; --line: #2a2f38; --text: #e6e8eb; --muted: #8b93a1;
-    --accent: #f0b429; --ok: #3ecf8e; --bad: #ef4444;
+    --bg: #0c0d0e;          /* the screen behind the panels */
+    --panel: #141516;       /* a merchant panel */
+    --slot: #1a1b1d;        /* an inventory slot */
+    --line: #34373a;        /* slot and panel borders */
+    --line-soft: #242628;
+    --text: #dcdcd7;
+    --muted: #8a8d8b;
+    --accent: #e8642c;      /* Purchase orange */
+    --accent-ink: #1a0d06;
+    --accent-dim: #3a1c10;  /* the active tab behind Purchase */
+    --good: #62b35a; --warn: #d6a136; --bad: #d9443b;
+    --font-ui: "Saira Semi Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+    --font-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
-  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  header h1 { margin: 0; font-size: 18px; }
-  header .status { color: var(--muted); }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 0 20px 16px; }
-  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
-  /* top: result on the left (stays in place when scrolling), map on the right in its own box */
-  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px 20px 0; align-items: start; }
-  .top .result-col { position: sticky; top: 8px; }
-  .map-wrap { max-height: calc(100vh - 150px); overflow: auto; }
-  @media (max-width: 960px) { .top { grid-template-columns: 1fr; } .top .result-col { position: static; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
-  section h2 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  button { background: #2a2f38; color: var(--text); border: 1px solid #3a414d; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; }
-  button:hover { background: #343a45; }
-  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font-body); }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Header: brand, the catch controls, status, display mode and language */
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: #101112; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+  .brand img { width: 28px; height: 28px; display: block; }
+  header h1 { margin: 0; font: 700 19px/1 var(--font-ui); letter-spacing: .04em; text-transform: uppercase; }
+  header .status { color: var(--muted); font-size: 13px; padding: 3px 10px; border: 1px solid var(--line-soft); background: var(--panel); }
+
+  /* Panels: a title strip like the merchant's Mysterious Supplies bar, then the content */
+  section { background: var(--panel); border: 1px solid var(--line); padding: 0 14px 14px; margin-bottom: 14px; }
+  section > h2 { margin: 0 -14px 12px; padding: 7px 14px; font: 600 13px/1.2 var(--font-ui); text-transform: uppercase;
+    letter-spacing: .08em; color: var(--text); background: #1c1d1f; border-bottom: 1px solid var(--line); }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start;
+    padding-block: 14px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .top .result-col { position: sticky; top: 64px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px;
+    padding-block: 0 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  @media (max-width: 960px) { .top, main { grid-template-columns: 1fr; } .top .result-col { position: static; } }
+
+  /* Controls: square, condensed caps; the main action is the merchant's orange */
+  button { background: #222426; color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 7px 14px;
+    font: 600 13px/1.2 var(--font-ui); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+  button:hover { background: #2b2d30; border-color: #4a4d51; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.primary:hover { background: #f07238; }
   button.danger { color: var(--bad); }
-  button.small { padding: 3px 8px; font-size: 12px; }
-  button:disabled { opacity: .45; cursor: default; }
-  select, input[type=text], input[type=number] { background: #111317; color: var(--text); border: 1px solid #3a414d; border-radius: 6px; padding: 6px 8px; font: inherit; min-width: 0; }
+  button.small { padding: 3px 8px; font-size: 11px; }
+  button:disabled { opacity: .4; cursor: default; }
+  select, input[type=text], input[type=number] { background: var(--slot); color: var(--text); border: 1px solid var(--line);
+    border-radius: 0; padding: 6px 8px; font: 14px var(--font-body); min-width: 0; }
   label { color: var(--muted); }
+  input[type=range] { width: 140px; accent-color: var(--accent); }
+  input[type=checkbox] { accent-color: var(--accent); }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-  canvas { width: 100%; display: block; background: #0b0c0f; border-radius: 6px; }
-  #screen { cursor: crosshair; }
-  #map { cursor: pointer; width: auto; max-width: 100%; margin: 0 auto; }
-  .muted { color: var(--muted); }
-  .help li { margin-bottom: 6px; }
-  input[type=range] { width: 140px; }
-  .payback { margin-top: 10px; padding: 8px 10px; border: 1px solid; border-radius: 8px; display: grid; gap: 3px; font-size: 13px; }
-  .rank { margin-top: 10px; display: grid; gap: 4px; font-size: 13px; }
-  .rank .row { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 6px; background: #ffffff08; }
-  .rank .row.top { background: #22c55e1a; }
-  .rank .row b { min-width: 2.2em; }
-  #log { max-height: 180px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-  /* Steps */
-  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .step { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; color: var(--muted); font-size: 13px; }
-  .step b { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; background: #2a2f38; margin-right: 6px; }
-  .step.active { border-color: var(--accent); color: var(--text); }
-  .step.active b { background: var(--accent); color: #111; }
-  .step.done b { background: var(--ok); color: #111; }
-  .stage { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #f0b4290f; margin-bottom: 12px; }
-  .stage .title { font-size: 18px; font-weight: 700; color: var(--accent); }
-  .stage .grow { flex: 1; }
-
-  /* Result */
-  #result { border-radius: 8px; padding: 16px; background: #0b0c0f; border: 1px solid var(--line); min-height: 150px; transition: border-color .15s, background .15s; }
-  #result .big { font-size: 40px; font-weight: 800; line-height: 1.1; }
-  .chance { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid; border-radius: 8px; margin: 12px 0; }
-  .chance b { font-size: 18px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .tile { background: #1a1d23; border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px 6px; text-align: center; }
-  .tile img { width: 72px; height: 72px; object-fit: contain; display: block; margin: 0 auto; }
-  .tile .noimg { height: 72px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
-  .tile i { display: block; height: 3px; border-radius: 2px; margin: 6px 10px; }
-  .tile b { font-size: 15px; font-variant-numeric: tabular-nums; }
-
   .lang { margin-left: auto; }
-  /* overlay window (one monitor): the result card and the map float above the game */
-  .overlay { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 0.95fr); gap: 8px; height: 100vh; box-sizing: border-box; }
-  .overlay .ov-map, .overlay .ov-side { min-height: 0; overflow: auto; }
-  .overlay .ov-side { display: flex; flex-direction: column; gap: 8px; }
-  .overlay .ov-side > * { flex: none; } /* the column scrolls; its blocks keep their height */
-  .overlay .stage { padding: 6px 8px; flex-wrap: wrap; gap: 6px; }
-  .overlay .stage .grow { display: none; }
-  .overlay #result { padding: 10px; min-height: 0; }
-  .overlay #result .big { font-size: 22px; }
-  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
-  .overlay .tile img { width: 40px; height: 40px; }
-  .overlay .map-wrap { max-height: none; margin-top: 0; }
-  .overlay .rank { margin-top: 0; font-size: 12px; }
-  .overlay .rank .row { flex-wrap: wrap; gap: 4px 8px; }
-  .update { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #3b82f6; color: #93c5fd; text-decoration: none; font-size: 13px; }
-  .update:hover { background: rgba(59, 130, 246, .15); }
-  .update:not([hidden]) + .lang { margin-left: 0; }
-  .credits { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 20px 20px; }
-  .map-pop { position: fixed; z-index: 10; width: 340px; background: #15181d; border: 1px solid #3a414d; border-radius: 10px; padding: 12px; box-shadow: 0 8px 30px #000a; pointer-events: none; }
+  .muted { color: var(--muted); }
+
+  canvas { width: 100%; display: block; background: var(--bg); }
+  #map { cursor: pointer; width: auto; max-width: 100%; margin: 0 auto; }
+  .map-wrap { max-height: calc(100vh - 170px); overflow: auto; border: 1px solid var(--line-soft); background: var(--bg); }
+
+  /* Stage of the map: what to do now, and the map buttons */
+  .stage { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 12px; margin-bottom: 10px;
+    background: var(--accent-dim); border-left: 3px solid var(--accent); }
+  .stage .title { font: 700 17px/1.2 var(--font-ui); color: #ffb48a; text-transform: uppercase; letter-spacing: .03em; }
+  .stage .grow { flex: 1; color: #d9b9a6; font-size: 13px; }
+
+  /* Result card */
+  #result { padding: 16px; background: var(--slot); border: 1px solid var(--line); min-height: 150px; transition: border-color .15s, background .15s; }
+  #result .big { font: 700 38px/1.05 var(--font-ui); text-transform: uppercase; letter-spacing: .01em; }
+  #result .sub { color: var(--muted); margin: 6px 0 12px; }
+  .chance { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid; margin: 12px 0;
+    font-family: var(--font-ui); text-transform: uppercase; letter-spacing: .04em; font-size: 13px; }
+  .chance b { font-size: 20px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .sizes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .size { border: 1px solid var(--line); padding: 2px 8px; font: 500 13px var(--font-ui); font-variant-numeric: tabular-nums; }
+  .size.on { background: #ffffff10; outline: 1px solid var(--text); }
+  .payback { margin-top: 10px; padding: 9px 12px; border: 1px solid; display: grid; gap: 3px; font-size: 13px; }
+  .payback b { font: 700 14px var(--font-ui); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* Item slots: square cells with the rarity strip, like the stash */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; margin-top: 12px; }
+  .tile { background: #121314; border: 1px solid var(--line); padding: 8px 6px 6px; text-align: center; }
+  .tile img { width: 68px; height: 68px; object-fit: contain; display: block; margin: 0 auto; }
+  .tile .noimg { height: 68px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
+  .tile i { display: block; height: 3px; margin: 6px 4px; }
+  .tile b { font: 600 15px var(--font-ui); font-variant-numeric: tabular-nums; }
+
+  /* Best buys under the map */
+  .rank { margin-top: 10px; display: grid; gap: 4px; font-size: 13px; }
+  .rank > .muted { font: 600 12px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; }
+  .rank .row { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; margin: 0; background: var(--slot); border: 1px solid var(--line-soft); }
+  .rank .row.top { border-color: #3c5a38; background: #182417; }
+  .rank .row b { min-width: 2.2em; font-family: var(--font-ui); color: var(--good); }
+  .rank .grow { flex: 1; min-width: 0; }
+
+  /* Map popup */
+  .map-pop { position: fixed; z-index: 10; width: 340px; background: #111213; border: 1px solid #4a4d51; padding: 12px; box-shadow: 0 10px 30px #000c; pointer-events: none; }
   .map-pop .head { color: var(--muted); font-size: 13px; }
   .map-pop .tiles { grid-template-columns: repeat(3, 1fr); }
-  .map-pop .tile img { width: 56px; height: 56px; }
-  #result .sub { color: var(--muted); margin: 4px 0 12px; }
-  .bars div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .bars .bar { flex: 1; height: 10px; background: #1a1d23; border-radius: 5px; overflow: hidden; }
-  .bars .bar i { display: block; height: 100%; }
-  .bars .name { width: 100px; }
-  .bars .val { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
-  .items { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 12px; background: #1a1d23; border: 1px solid var(--line); font-size: 13px; }
-  .chip img { width: 28px; height: 28px; object-fit: contain; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .map-pop .tile img { width: 54px; height: 54px; }
 
-  /* Sounds */
-  .sound { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+  /* Tools below: level, log, sound library, help */
+  #log { max-height: 190px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #log div { padding: 1px 0; border-bottom: 1px solid #ffffff06; }
+  .help { padding-left: 20px; }
+  .help li { margin-bottom: 6px; max-width: 70ch; }
+  .sound { border: 1px solid var(--line-soft); background: var(--slot); padding: 10px; margin-bottom: 8px; }
   .sound.recording { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
   .sound.hit { border-color: var(--accent); }
   .sound-head { display: flex; align-items: center; gap: 8px; }
-  .sound-head .grow { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sound-head .grow { flex: 1; font: 600 14px var(--font-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sound .meta { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
   .item-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 13px; }
   .item-row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item-row img { width: 24px; height: 24px; object-fit: contain; background: #0b0c0f; border-radius: 4px; }
+  .item-row img { width: 24px; height: 24px; object-fit: contain; background: var(--bg); }
   .add-item { display: grid; grid-template-columns: 1fr 96px 74px 50px auto; gap: 6px; margin-top: 8px; }
-  details summary { cursor: pointer; font-size: 12px; }
-  .sizes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .size { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .size.on { background: #ffffff14; outline: 2px solid var(--text); }
+  details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
   .odds { margin-top: 12px; }
   .odds-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; border-bottom: 1px solid #ffffff0a; }
   .odds-row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .odds-row img { width: 24px; height: 24px; object-fit: contain; }
   .odds-row b { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+  .bars div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .bars .bar { flex: 1; height: 10px; background: var(--slot); overflow: hidden; }
+  .bars .bar i { display: block; height: 100%; }
+  .bars .name { width: 100px; }
+  .bars .val { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+  .items { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: var(--slot); border: 1px solid var(--line); font-size: 13px; }
+  .chip img { width: 28px; height: 28px; object-fit: contain; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .credits { text-align: center; color: var(--muted); font: 500 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase;
+    padding-block: 6px 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+  /* Overlay window (one monitor): the map on the left; stage, result and best buys on the right */
+  .overlay { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 0.95fr); gap: 8px; height: 100vh; background: var(--bg); }
+  .overlay .ov-map, .overlay .ov-side { min-height: 0; overflow: auto; }
+  .overlay .ov-side { display: flex; flex-direction: column; gap: 8px; }
+  .overlay .ov-side > * { flex: none; } /* the column scrolls; its blocks keep their height */
+  .overlay .stage { padding: 6px 10px; gap: 6px; margin: 0; }
+  .overlay .stage .title { font-size: 15px; }
+  .overlay .stage .grow { display: none; }
+  .overlay #result { padding: 10px; min-height: 0; }
+  .overlay #result .big { font-size: 22px; }
+  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 4px; }
+  .overlay .tile { padding: 4px 3px 3px; }
+  .overlay .tile img { width: 40px; height: 40px; }
+  .overlay .tile b { font-size: 13px; }
+  .overlay .tiles .tile:nth-child(n+9) { display: none; } /* the 8 most likely items: the best buys stay in view */
+  .overlay .map-wrap { max-height: none; }
+  .overlay .rank { margin-top: 0; font-size: 12px; }
+  .overlay .rank .row { flex-wrap: wrap; gap: 4px 8px; padding: 5px 8px; }
+  @media (prefers-reduced-motion: reduce) { #result { transition: none; } }
 </style>
 </head>
 <body>
 <header>
-  <h1 data-i18n="app">Merchant Ear</h1>
+  <div class="brand"><img src="icon.svg" alt=""><h1 data-i18n="app">Merchant Ear</h1></div>
   <button id="btnStart" class="primary" data-i18n="btn.start">Start catching</button>
   <button id="btnStop" disabled data-i18n="btn.stop">Stop</button>
   <span class="status" id="status" data-i18n="status.idle">Not running</span>
@@ -275,22 +320,29 @@ const SPLIT_SHARE = 0.35;    // smaller cargo beat a big one if each was seen at
 const UP_BIAS = 0.03;        // "put down" beats "pick up" only by this margin
 const TAP_BLOCK = 512;       // how many audio samples to pass from the audio stream at once
 
+// The page palette for canvas drawing and generated cards (the same colors as the CSS tokens)
+const UI = {
+  bg: '#0c0d0e', slot: '#1a1b1d', line: '#34373a', lineSoft: '#242628', text: '#dcdcd7', muted: '#8a8d8b',
+  accent: '#e8642c', good: '#62b35a', warn: '#d6a136', bad: '#d9443b', cursor: '#4fc9de',
+  purple: '#9b6bd3', blue: '#4a86d6', white: '#c9cbcc',
+};
+
 const QUALITIES = [
   // names: qName() in the current language
-  { id: 'red', color: '#ef4444' },
-  { id: 'gold', color: '#f0b429' },
-  { id: 'purple', color: '#a855f7' },
-  { id: 'blue', color: '#3b82f6' },
-  { id: 'green', color: '#22c55e' },
-  { id: 'white', color: '#d1d5db' },
+  { id: 'red', color: UI.bad },
+  { id: 'gold', color: UI.warn },
+  { id: 'purple', color: UI.purple },
+  { id: 'blue', color: UI.blue },
+  { id: 'green', color: UI.good },
+  { id: 'white', color: UI.white },
 ];
 const qById = Object.fromEntries(QUALITIES.map(q => [q.id, q]));
 const SIZES = ['1x1', '1x2', '2x1', '2x2', '2x3', '3x2'];
 const SIZE_KEYS = ['1x1', '1x2', '2x2', '1x3', '2x3', '3x3']; // sizes without rotation, for display
 const MYSTERY_TIERS = {
-  rare: { short: 'Rare', tiny: 'Rare', name: 'Rare Mystery Cargo', color: '#a855f7' },
-  uncommon: { short: 'Uncommon', tiny: 'Unc', name: 'Uncommon Mystery Cargo', color: '#3b82f6' },
-  common: { short: 'Mystery', tiny: 'Myst', name: 'Mystery Cargo', color: '#d1d5db' },
+  rare: { short: 'Rare', tiny: 'Rare', name: 'Rare Mystery Cargo', color: UI.purple },
+  uncommon: { short: 'Uncommon', tiny: 'Unc', name: 'Uncommon Mystery Cargo', color: UI.blue },
+  common: { short: 'Mystery', tiny: 'Myst', name: 'Mystery Cargo', color: UI.white },
 };
 const LABEL_TRIES = 4;       // attempts to read a cargo label
 const LABEL_RETRY_MS = 700;  // no sooner than this after the previous attempt
@@ -878,7 +930,7 @@ function showResult(sound, score, second, size, label, sizeMiss = false) {
     <div class="big" style="color:${color}">${red >= 0.995 ? tr('card.red') : red > 0 ? tr('card.redP', { p: pct(red) }) : tr('card.notRed')}</div>
     <div class="sub">${esc(parts[0] + (size ? tr('card.cargo', { size: normSize(size) }) : ''))}${label && (label.mystery || label.category) ? `, ${esc(labelName(label))}` : ''}${label && label.price ? `, ${fmtPrice(label.price)}` : ''}</div>
     ${sizes ? `<div class="sizes">${sizes}</div>` : ''}
-    ${sizeMiss ? `<div class="muted" style="margin-top:8px;color:#f0b429">${esc(tr('card.sizeMiss', { size: normSize(size) }))}</div>` : ''}
+    ${sizeMiss ? `<div class="muted" style="margin-top:8px;color:${UI.warn}">${esc(tr('card.sizeMiss', { size: normSize(size) }))}</div>` : ''}
     ${chanceRow(red)}
     ${paybackRow(label && label.price ? payback(itemOdds(sound, size, label), label.price) : null)}
     ${itemTiles(itemOdds(sound, size, label))}
@@ -1602,7 +1654,7 @@ function payback(list, cost) {
 // The payback block of a card
 function paybackRow(pb) {
   if (!pb) return '';
-  const color = { buy: '#22c55e', risk: '#f0b429', skip: '#ef4444' }[pb.verdict];
+  const color = { buy: UI.good, risk: UI.warn, skip: UI.bad }[pb.verdict];
   return `<div class="payback" style="border-color:${color}66;background:${color}14">
     <div><b style="color:${color}">${tr('pb.' + pb.verdict)}</b> <span class="muted">${tr('pb.basis.' + valueBasis)}</span></div>
     <div>${tr('pb.ev', { ev: money(pb.ev), cost: money(pb.cost), roi: (pb.roi >= 0 ? '+' : '') + pct(pb.roi) })}</div>
@@ -1690,7 +1742,7 @@ function showHover(rec) {
   const odds = cargoRedOdds(rec);
   const label = rec.label;
   const red = odds ? odds.red : null;
-  const color = red === null ? '#8b93a1' : redColor(red);
+  const color = red === null ? UI.muted : redColor(red);
   ui.result.style.borderColor = color;
   ui.result.style.background = color + '1a';
   const title = red === null ? tr('hover.title') : red >= 0.995 ? tr('card.red') : red > 0 ? tr('hover.maybe', { p: pctFine(red) }) : tr('hover.none');
@@ -1919,10 +1971,10 @@ function drawMapInner() {
   const H = placed.length ? Math.min(MAP_MAX_ROWS, Math.max(1, maxR - minR)) * MAP_U : 120;
   if (ui.map.width !== W || ui.map.height !== H) { ui.map.width = W; ui.map.height = H; }
   const c = mapCtx;
-  c.fillStyle = '#0b0c0f';
+  c.fillStyle = UI.bg;
   c.fillRect(0, 0, W, H);
   if (!placed.length) {
-    c.fillStyle = '#8b93a1'; c.font = '13px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = UI.muted; c.font = '13px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(tr('map.empty'), W / 2, H / 2);
     return;
   }
@@ -1937,7 +1989,7 @@ function drawMapInner() {
   const decorate = (key, rec, x, y, w, h) => {
     const pb = rankingPb(ranking, key);
     if (pb) {
-      const col = { buy: '#22c55e', risk: '#f0b429', skip: '#ef4444' }[pb.verdict];
+      const col = { buy: UI.good, risk: UI.warn, skip: UI.bad }[pb.verdict];
       // under the price in the top-right corner: the mean payback against the price
       const text = (pb.roi >= 0 ? '+' : '') + pct(pb.roi);
       c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'right'; c.textBaseline = 'top';
@@ -1948,14 +2000,14 @@ function drawMapInner() {
     }
     if (rankOf.has(key)) {
       const n = rankOf.get(key);
-      c.fillStyle = '#22c55e';
+      c.fillStyle = UI.good;
       c.beginPath(); c.arc(x + w - 12, y + h - 12, 9, 0, Math.PI * 2); c.fill();
-      c.fillStyle = '#04110a'; c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = UI.bg; c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.fillText('#' + n, x + w - 12, y + h - 11.5);
     }
     if (key && key === hoverKey) {
       c.save();
-      c.strokeStyle = '#22d3ee'; c.lineWidth = 3; c.setLineDash([6, 4]);
+      c.strokeStyle = UI.cursor; c.lineWidth = 3; c.setLineDash([6, 4]);
       c.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
       c.restore();
     }
@@ -1964,18 +2016,18 @@ function drawMapInner() {
   for (const rec of placed) {
     const key = keyOf.get(rec);
     const x = (rec.C - minC) * MAP_U, y = (rec.R - minR) * MAP_U, w = rec.w * MAP_U, h = rec.h * MAP_U;
-    c.fillStyle = '#15181d';
+    c.fillStyle = UI.slot;
     c.fillRect(x + 2, y + 2, w - 4, h - 4);
     if (rec.thumb) { c.globalAlpha = 0.35; c.drawImage(rec.thumb, x + 2, y + 2, w - 4, h - 4); c.globalAlpha = 1; }
 
     if (rec.bought) {
       // already bought: dimmed, with what dropped
-      c.fillStyle = 'rgba(11,12,15,.7)';
+      c.fillStyle = 'rgba(12,13,14,.7)';
       c.fillRect(x + 2, y + 2, w - 4, h - 4);
       if (rec.bought.img) { c.globalAlpha = 0.6; drawItemIcon(c, rec.bought, x + 8, y + 8, w - 16, h - 16); c.globalAlpha = 1; }
-      c.strokeStyle = '#3a414d'; c.lineWidth = 1;
+      c.strokeStyle = UI.line; c.lineWidth = 1;
       c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
-      c.fillStyle = '#22c55e'; c.font = 'bold 14px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
+      c.fillStyle = UI.good; c.font = 'bold 14px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText('✓', x + 6, y + 4);
       continue;
     }
@@ -1989,19 +2041,19 @@ function drawMapInner() {
       // few others; Household Items 100k has two reds at ~0.1%, that is not worth a highlight)
       const pre = label && label.category && !revealed ? cargoRedOdds(rec) : null;
       if (label && label.category && !revealed && !(pre && pre.red >= CATEGORY_RED_MIN)) {
-        c.fillStyle = 'rgba(11,12,15,.6)';
+        c.fillStyle = 'rgba(12,13,14,.6)';
         c.fillRect(x + 2, y + 2, w - 4, h - 4);
-        c.strokeStyle = '#2a2f38'; c.lineWidth = 1;
+        c.strokeStyle = UI.lineSoft; c.lineWidth = 1;
         c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
       } else if (label && label.category && !revealed) {
         // a category cargo that may hold a red: amber border with its short name
-        c.strokeStyle = '#f0b429'; c.lineWidth = 2;
+        c.strokeStyle = UI.warn; c.lineWidth = 2;
         c.strokeRect(x + 3, y + 3, w - 6, h - 6);
         c.font = 'bold 10px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
         const text = rec.w > 1 ? label.name.split(' ')[0] : label.name.slice(0, 4);
         c.lineWidth = 3; c.strokeStyle = '#000';
         c.strokeText(text, x + w / 2, y + h - 4);
-        c.fillStyle = '#f0b429';
+        c.fillStyle = UI.warn;
         c.fillText(text, x + w / 2, y + h - 4);
       } else if (label && label.mystery && !revealed) {
         // Mystery Cargo: may hold a red; border and caption by tier
@@ -2024,10 +2076,10 @@ function drawMapInner() {
         c.fillStyle = revealed.color;
         c.fillText(qName(revealed), x + w / 2, y + h - 4);
       } else {
-        c.strokeStyle = '#3a414d'; c.lineWidth = 1;
+        c.strokeStyle = UI.line; c.lineWidth = 1;
         c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
       }
-      c.fillStyle = '#8b93a1'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
+      c.fillStyle = UI.muted; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText('?', x + 6, y + 5);
       if (rec.price) {
         // tooltip price and the red chance by it (before any sound)
@@ -2036,7 +2088,7 @@ function drawMapInner() {
         c.lineWidth = 3; c.strokeStyle = '#000';
         const text = money(rec.price) + (odds && odds.red > 0 ? ` · ${pct(odds.red)}` : '');
         c.strokeText(text, x + w - 5, y + 5);
-        c.fillStyle = odds && odds.red > 0 ? redColor(odds.red) : '#e6e8eb';
+        c.fillStyle = odds && odds.red > 0 ? redColor(odds.red) : UI.text;
         c.fillText(text, x + w - 5, y + 5);
       }
       decorate(key, rec, x, y, w, h);
@@ -2049,7 +2101,7 @@ function drawMapInner() {
     // If there is one item (or nearly certain), one big picture.
     const cands = itemOdds(sound, size, info).filter(x => x.p >= 0.02);
     const top = cands.slice().sort((a, b) => b.p - a.p)[0];
-    c.fillStyle = red > 0 ? 'rgba(127,29,29,.55)' : '#15181d';
+    c.fillStyle = red > 0 ? 'rgba(110,30,26,.55)' : UI.slot;
     c.fillRect(x + 2, y + 2, w - 4, h - 4);
     if (top && (cands.length === 1 || top.p >= 0.995)) {
       drawItemIcon(c, top.it, x + 6, y + 4, w - 12, h - 16);
@@ -2065,12 +2117,12 @@ function drawMapInner() {
         c.fillStyle = qById[it.q].color;
         c.fillRect(cx + cw * 0.2, cy + s + 2, cw * 0.6, 2);
         c.font = 'bold 9px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top';
-        c.fillStyle = '#e6e8eb';
+        c.fillStyle = UI.text;
         c.fillText(pctFine(p), cx + cw / 2, cy + s + 4);
       });
     }
-    const color = red > 0 ? '#ef4444' : '#3a414d';
-    c.strokeStyle = key === lastKey ? '#f0b429' : color; c.lineWidth = key === lastKey || red > 0 ? 3 : 1;
+    const color = red > 0 ? UI.bad : UI.line;
+    c.strokeStyle = key === lastKey ? UI.warn : color; c.lineWidth = key === lastKey || red > 0 ? 3 : 1;
     c.strokeRect(x + 3, y + 3, w - 6, h - 6);
     decorate(key, rec, x, y, w, h);
   }
@@ -2078,14 +2130,14 @@ function drawMapInner() {
   // the part of the list on screen now, outlined, so it is clear where the game view is on the whole-list map
   if (viewport && P && lastView) {
     const top = (viewport.y + offset) / P - minR, left = (viewport.x - phaseX) / P - minC;
-    c.save(); c.strokeStyle = 'rgba(34,211,238,.45)'; c.lineWidth = 2; c.setLineDash([3, 5]);
+    c.save(); c.strokeStyle = 'rgba(79,201,222,.45)'; c.lineWidth = 2; c.setLineDash([3, 5]);
     c.strokeRect(left * MAP_U + 1, top * MAP_U + 1, viewport.w / P * MAP_U - 2, viewport.h / P * MAP_U - 2);
     c.restore();
   }
   const cur = cursorTrack[cursorTrack.length - 1];
   if (cur && cur.in && viewport && P && cur.y >= viewport.y && cur.y < viewport.y + viewport.h) {
     const mx = ((cur.x - phaseX) / P - minC) * MAP_U, my = ((cur.y + offset) / P - minR) * MAP_U;
-    c.fillStyle = '#22d3ee'; c.strokeStyle = '#000'; c.lineWidth = 2;
+    c.fillStyle = UI.cursor; c.strokeStyle = '#000'; c.lineWidth = 2;
     c.beginPath(); c.arc(mx, my, 5, 0, Math.PI * 2); c.fill(); c.stroke();
   }
 }
@@ -2115,7 +2167,7 @@ function renderRank(ranking, rankOf) {
   if (!ranking.length) { el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = `<div class="muted">${esc(tr('rank.title', { basis: tr('pb.basis.' + valueBasis) }))}</div>` + ranking.slice(0, 8).map(x => {
-    const col = { buy: '#22c55e', risk: '#f0b429', skip: '#ef4444' }[x.pb.verdict];
+    const col = { buy: UI.good, risk: UI.warn, skip: UI.bad }[x.pb.verdict];
     return `<div class="row${rankOf.has(x.key) ? ' top' : ''}">
       <b>${rankOf.has(x.key) ? '#' + rankOf.get(x.key) : ''}</b>
       <span class="grow">${esc(cargoHead(x.rec))}${x.heard ? ' · ' + esc(tr('rank.heard')) : ''}</span>
@@ -2342,12 +2394,12 @@ function setRecording(id) {
 function drawLevel(db, trig) {
   const { width: w, height: h } = ui.spec;
   specCtx.drawImage(ui.spec, -1, 0);
-  specCtx.fillStyle = '#0b0c0f';
+  specCtx.fillStyle = UI.bg;
   specCtx.fillRect(w - 1, 0, 1, h);
   const v = Math.min(1, Math.max(0, (db + 90) / 80));
   specCtx.fillStyle = `hsl(${200 - v * 160}, 80%, 55%)`;
   specCtx.fillRect(w - 1, h - v * h, 1, v * h);
-  if (trig) { specCtx.fillStyle = recordingId ? '#ef4444' : '#f0b429'; specCtx.fillRect(w - 1, 0, 1, 8); }
+  if (trig) { specCtx.fillStyle = recordingId ? UI.bad : UI.warn; specCtx.fillRect(w - 1, 0, 1, 8); }
 }
 
 // ---------- Library ----------
@@ -2415,7 +2467,7 @@ function itemName(it) { return I18n.lang === 'en' && it.nameEn ? it.nameEn : it.
 function soundName(s) { return I18n.lang === 'en' && s.nameEn ? s.nameEn : s.name; }
 function qName(q) { return tr('q.' + q.id); }
 function money(x) { return x >= 1e6 ? (x / 1e6).toFixed(1) + 'M' : Math.round(x / 1000) + 'k'; }
-function redColor(red) { return red >= 0.5 ? '#ef4444' : red > 0 ? '#f0b429' : '#8b93a1'; }
+function redColor(red) { return red >= 0.5 ? UI.bad : red > 0 ? UI.warn : UI.muted; }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function setStatus(s) { ui.status.textContent = s; }
 function log(s) {
@@ -2551,6 +2603,10 @@ async function openOverlay() {
   try { w = await documentPictureInPicture.requestWindow({ width: 640, height: 560 }); }
   catch { log(tr('log.noPip')); return; }
   overlayWin = w;
+  // the web fonts come from another site, so their stylesheet cannot be copied rule by rule: it is linked again
+  const fonts = $('fonts');
+  if (fonts) { const l = w.document.createElement('link'); l.rel = 'stylesheet'; l.href = fonts.href; w.document.head.append(l); }
+  w.document.body.style.margin = '0';
   for (const ss of document.styleSheets) {
     try {
       const st = w.document.createElement('style');
