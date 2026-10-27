@@ -200,6 +200,16 @@ namespace AbiKaluvan.Client
         [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
         [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
         [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hwnd, ref Point point);
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+
+        // The system cursor position in screen pixels (the process is DPI aware, so the same pixels as the capture)
+        public static bool CursorPos(out int x, out int y)
+        {
+            Point p;
+            bool ok = GetCursorPos(out p);
+            x = p.X; y = p.Y;
+            return ok;
+        }
         delegate bool EnumProc(IntPtr hwnd, IntPtr param);
         [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }

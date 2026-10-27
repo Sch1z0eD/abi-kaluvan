@@ -180,6 +180,7 @@ namespace AbiKaluvan.Client
                     // only the right part of the window: the merchant is there; capturing and encoding the left half is wasted
                     int cut = (int)Math.Round(area.Width * MERCHANT_SIDE);
                     var bmp = Screen.Capture(new System.Drawing.Rectangle(area.X + cut, area.Y, area.Width - cut, area.Height));
+                    SendCursor(area.X + cut, area.Y, area.Width - cut, area.Height);
                     // if the previous one is not encoded yet, replace it with the fresh one, so the queue does not grow
                     var old = Interlocked.Exchange(ref pending, bmp);
                     if (old != null) old.Dispose();
@@ -189,6 +190,26 @@ namespace AbiKaluvan.Client
                 int rest = SCREEN_FRAME_MS - (int)(watch.ElapsedMilliseconds - started);
                 if (rest > 0) Thread.Sleep(rest);
             }
+        }
+
+        // Where the mouse cursor is, in frame pixels (the frame is the captured right part of the window), sent with
+        // every frame. The page takes the cargo under the cursor as the hovered one and, at the moment a pick-up
+        // sound starts, as the dragged one. Only the system cursor position is read (GetCursorPos, as any app can);
+        // the game is not touched. The frame itself never contains the cursor.
+        static string lastCursor = null;
+        static void SendCursor(int x0, int y0, int w, int h)
+        {
+            int x, y;
+            if (!Screen.CursorPos(out x, out y)) return;
+            x -= x0; y -= y0;
+            bool inside = x >= 0 && y >= 0 && x < w && y < h;
+            string json = "{\"type\":\"cursor\",\"x\":" + x + ",\"y\":" + y + ",\"in\":" + (inside ? "true" : "false") + "}";
+            if (json == lastCursor) return; // the page keeps the last position: an unchanged one is not resent
+            lastCursor = json;
+            WebSocket[] list;
+            lock (screenClients) list = screenClients.ToArray();
+            var msg = Encoding.UTF8.GetBytes(json);
+            foreach (var ws in list) Send(ws, msg, WebSocketMessageType.Text);
         }
 
         static void EncodeLoop()

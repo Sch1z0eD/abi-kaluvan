@@ -299,7 +299,10 @@ const VALUE_BASES = ['contact', 'merchant', 'market']; // see itemValue
 const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
 const PRICE_MATCH_LOG = 0.25; // the tooltip price must be close to the pool price (in log scale, ≈ ±28%)
 const HOVER_DIFF = 12;       // a cargo changed more than this: the price tooltip covered it
-const HOVER_KEEP_MS = 6000;  // for this long after hovering, a "pick up" sound belongs to the hovered cargo
+const HOVER_KEEP_MS = 6000;  // the hovered cargo stays outlined on the map this long
+const HOVER_RECENT_MS = 2000; // without the cursor and the red trace, a sound belongs to a cargo hovered this recently
+const CURSOR_KEEP_MS = 3000; // how much cursor history to keep (the sound is matched ~0.35 s after it started)
+const RESULT_HOLD_MS = 4000; // a sound result stays in the card this long before hovering replaces it
 const HOVER_MAX_CARGO = 16;  // a tooltip covers at most this many cargo; more is not a tooltip
 const TIP_W = 3.2, TIP_H = 1.8; // price tooltip size in cells (with a margin)
 const BASE_UPDATE_MAX = 6;   // the appearance reference is updated only on small changes (not on a tooltip)
@@ -365,6 +368,7 @@ let balanceSig = null, feedQueue = [], feedDone = []; // feed lines: waiting for
 let feedBusy = false, feedAt = 0, feedSig = null; // reading of the feed line and the balance
 let libPools = [], itemQ = {}, itemById = new Map(); // merchant pools and items from the library
 let hover = null;            // the cargo just hovered: { key, t }
+let cursorTrack = [];        // cursor positions from the client: [{ t, x, y, in }] in frame px, the last CURSOR_KEEP_MS
 let hoverBusy = false, hoverSig = ''; // price tooltip reading: busy / which cargo it covers
 
 // Merchant grid. "Region" coordinates are frame pixels relative to the region's top-left corner.
@@ -534,6 +538,7 @@ function startNativeScreen() {
   screenWs.onmessage = e => {
     if (typeof e.data === 'string') {
       const m = JSON.parse(e.data);
+      if (m.type === 'cursor') { onCursor(m); return; }
       if (m.type !== 'screen') return;
       frameCropped = !!m.crop;
       if (m.black) log(tr('log.black'));
@@ -549,10 +554,11 @@ function startNativeScreen() {
       .catch(() => {})
       .finally(() => { busy = false; });
   };
-  screenWs.onclose = () => { if (stream) { screenWs = null; log(tr('log.screenClosed')); } };
+  screenWs.onclose = () => { cursorTrack = []; if (stream) { screenWs = null; log(tr('log.screenClosed')); } };
 }
 
 function closeScreen() {
+  cursorTrack = []; // without the client there is no cursor: back to the tooltip and the red trace
   if (!screenWs) return;
   const ws = screenWs;
   screenWs = null;
@@ -663,10 +669,19 @@ function classify(win, onset) {
   // a cargo is searched only while the merchant is on screen: otherwise (stash, raid) the map is stale,
   // and the size of an unrelated cargo would spoil the odds
   const merchantOpen = cargo.size && performance.now() - gridSeenAt < MERCHANT_FRESH_MS;
-  // the cargo: the one just hovered (like the paid site does); otherwise by the red trace
-  const hovered = hover && performance.now() - hover.t < HOVER_KEEP_MS && cargo.has(hover.key) ? hover.key : null;
-  const key = merchantOpen ? hovered || pickCargo(onset) : null;
-  hover = null;
+  // The cargo the sound belongs to, by the strength of the evidence:
+  //  1) under the mouse cursor at the moment the sound started (the client reports the cursor): the pick-up sound
+  //     plays at the press, while the cursor is still on the cargo — this is what the player actually took;
+  //  2) the red trace a dragged cargo leaves in its place;
+  //  3) the cargo whose price tooltip was read just before (not older than HOVER_RECENT_MS).
+  const recentHover = hover && performance.now() - hover.t < HOVER_RECENT_MS && cargo.has(hover.key) ? hover.key : null;
+  let key = null, keyBy = '';
+  if (merchantOpen) {
+    const byCursor = cursorCargo(onset), byTrace = !byCursor && pickCargo(onset);
+    key = byCursor || byTrace || recentHover;
+    keyBy = byCursor ? 'cursor' : byTrace ? 'trace' : key ? 'tooltip' : '';
+  }
+  if (!cursorTrack.length) hover = null;
   const rec = key && cargo.get(key);
   const size = rec ? `${rec.w}x${rec.h}` : '';
   const label = cargoInfo(rec);
@@ -691,7 +706,7 @@ function classify(win, onset) {
   if (key) {
     results.set(key, lastResult);
     lastKey = key;
-    log(tr('log.hitCargo', { name: soundName(best), p: pct(score), size: normSize(size), cell: cargoName(key), red: pct(red) }));
+    log(tr('log.hitCargo', { name: soundName(best), p: pct(score), size: normSize(size), cell: cargoName(key), red: pct(red) }) + (keyBy ? ' · ' + tr('log.by.' + keyBy) : ''));
   } else {
     lastKey = null;
     log(tr('log.hit', { name: soundName(best), p: pct(score), red: pct(red) }) + (merchantOpen ? tr('log.noCargo') : ''));
@@ -1042,7 +1057,7 @@ function analyze(src, rp) {
     // The price tooltip covered the scrollbar (a cargo near the right edge). The map is left alone, but the tooltip is still
     // read: while the cursor is on a cargo the list does not scroll, so the position is the last known one.
     const last = ring[ring.length - 1];
-    if (phase === 'frozen' && now - captureOnset > QUIET_MS && last) { last.offset = offset; detectHover(last); }
+    if ((phase === 'frozen' || cursorTrack.length) && now - captureOnset > QUIET_MS && last) { last.offset = offset; detectHover(last); }
     lastSeen = { grid, items }; updateStage(); return;
   }
   if (!sb && ++noBarCount < NO_BAR_LIMIT) { lastSeen = { grid, items }; updateStage(); return; } // still waiting for the scrollbar
@@ -1160,11 +1175,13 @@ function analyze(src, rp) {
     const red = Vision.meanOf(cargoPatch(rec, last, 'red'));
     if (red >= RED_MIN) continue; // still red after dragging
     // a price tooltip inside a large cargo does not break its borders: such a frame is not taken as a reference
-    if (phase === 'frozen' && rec.base && rec.base.length === patch.length && Vision.patchDiff(patch, rec.base) > BASE_UPDATE_MAX) continue;
+    // (in the scan phase too when the client reports the cursor: then tooltips are read while the map is built)
+    if ((phase === 'frozen' || cursorTrack.length) && rec.base && rec.base.length === patch.length && Vision.patchDiff(patch, rec.base) > BASE_UPDATE_MAX) continue;
     rec.base = patch;
     rec.baseRed = red;
   }
-  if (phase === 'frozen' && quiet && last) detectHover(last);
+  // price tooltips are read on a ready map; with the client's cursor also while the map is built
+  if ((phase === 'frozen' || cursorTrack.length) && quiet && last) detectHover(last);
   updateStage();
   if (mapVisible()) drawMap();
 }
@@ -1259,6 +1276,46 @@ function cargoRect(rec, frameOffset) {
 function cargoPatch(rec, frame, channel = 'small') {
   const r = cargoRect(rec, frame.offset);
   return r ? Vision.crop({ w: smallCanvas.width, g: frame[channel] }, r.x, r.y, r.w, r.h) : null;
+}
+
+// ---------- Mouse cursor (from the client) ----------
+// The map cargo at a point of the frame (frame px), or null outside the visible part of the list
+function cargoAtPoint(x, y) {
+  if (!viewport || !P || x < viewport.x || x >= viewport.x + viewport.w || y < viewport.y || y >= viewport.y + viewport.h) return null;
+  const C = Math.floor((x - phaseX) / P), R = Math.floor((y + offset) / P);
+  const hit = placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
+  return hit ? hit[0] : null;
+}
+
+// The cursor position at time t: the last one reported before it (an unchanged position is not resent)
+function cursorAt(t) {
+  let s = null;
+  for (const p of cursorTrack) { if (p.t <= t) s = p; else break; }
+  return s || cursorTrack[0] || null;
+}
+
+// The cargo under the cursor at time t
+function cursorCargo(t) {
+  const p = cursorAt(t);
+  return p && p.in ? cargoAtPoint(p.x, p.y) : null;
+}
+
+// A new cursor position: the cargo under it is the hovered one, outlined at once. Its card (label, chances,
+// payback by the price if known) replaces the result unless a sound result was shown just now.
+let hoverDrawAt = 0;
+function onCursor(m) {
+  const now = performance.now();
+  cursorTrack.push({ t: now, x: m.x, y: m.y, in: !!m.in });
+  while (cursorTrack.length > 2 && cursorTrack[0].t < now - CURSOR_KEEP_MS) cursorTrack.shift();
+  if (!viewport || !P) return;
+  const key = m.in ? cargoAtPoint(m.x, m.y) : null;
+  const prev = hover && hover.cursor ? hover.key : undefined;
+  if (key === prev) { if (hover) hover.t = now; return; }
+  hover = key ? { key, t: now, cursor: true } : null;
+  const rec = key && cargo.get(key);
+  if (rec && (!lastResult || Date.now() - lastResult.t > RESULT_HOLD_MS)) showHover(rec);
+  // redraws are limited: the cursor moves 30 times a second
+  if (mapVisible() && now - hoverDrawAt > 50) { hoverDrawAt = now; drawMap(); }
 }
 
 // The dragged cargo. When a cargo is dragged, a faint red trace stays in its place,
@@ -1462,7 +1519,10 @@ function detectHover(frame) {
   // Right away, before the tooltip is read (that takes Tesseract a fraction of a second): the tooltip opens below
   // and to the right of the cursor, so the hovered cargo is the top-left one of those it changed. It is outlined
   // and gets the next sound at once; the read below confirms it or moves it.
-  const guess = changed.slice().sort((a, b) => a.R - b.R || a.C - b.C)[0];
+  // With the client the cursor itself tells which cargo is hovered: no guessing, and the tooltip read below
+  // is attached to the cargo under the cursor at this moment.
+  const cursorKey = cursorTrack.length ? cursorCargo(performance.now()) : null;
+  const guess = !cursorTrack.length && changed.slice().sort((a, b) => a.R - b.R || a.C - b.C)[0];
   const guessEntry = guess && placedCargo().find(([, r]) => r === guess);
   if (guessEntry) {
     hover = { key: guessEntry[0], t: performance.now(), guess: true };
@@ -1494,15 +1554,17 @@ function detectHover(frame) {
     const cx = r.x + (tip.labelBox ? tip.labelBox.x0 - P * 0.25 : tip.priceBox.x0 - P * 0.55);
     const cy = r.y + (tip.labelBox ? tip.labelBox.y0 - P * 0.35 : tip.priceBox.y0 - P * 0.75);
     const C = Math.floor((cx - px0) / P), R = Math.floor((cy + off) / P);
-    const hit = placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
-    detectHover.last = { sig, text: data.text, C, R, hit: !!hit }; // for diagnostics
+    const hit = (cursorKey && placedCargo().find(([k]) => k === cursorKey))
+      || placedCargo().find(([, r]) => C >= r.C && C < r.C + r.w && R >= r.R && R < r.R + r.h);
+    detectHover.last = { sig, text: data.text, C, R, hit: !!hit, cursor: !!cursorKey }; // for diagnostics
     if (!hit) return;
     const [key, rec] = hit;
     rec.price = tip.price;
     rec.listPrice = tip.listPrice || 0;
     if (tip.label && !rec.label) rec.label = tip.label;
-    hover = { key, t: performance.now() };
-    showHover(rec);
+    // with the cursor the outline follows the cursor itself (it may have moved on while the tooltip was read)
+    if (!cursorTrack.length) hover = { key, t: performance.now() };
+    if (!lastResult || Date.now() - lastResult.t > RESULT_HOLD_MS || (hover && hover.key === key)) showHover(rec);
     if (mapVisible()) drawMap();
   }).catch(() => { hoverSig = ''; }).finally(() => { hoverBusy = false; });
 }
@@ -1867,6 +1929,13 @@ function drawMapInner() {
     c.strokeStyle = key === lastKey ? '#f0b429' : color; c.lineWidth = key === lastKey || red > 0 ? 3 : 1;
     c.strokeRect(x + 3, y + 3, w - 6, h - 6);
     decorate(key, rec, x, y, w, h);
+  }
+  // the mouse cursor (from the client), so it is visible that the map follows it
+  const cur = cursorTrack[cursorTrack.length - 1];
+  if (cur && cur.in && viewport && P && cur.y >= viewport.y && cur.y < viewport.y + viewport.h) {
+    const mx = ((cur.x - phaseX) / P - minC) * MAP_U, my = ((cur.y + offset) / P - minR) * MAP_U;
+    c.fillStyle = '#22d3ee'; c.strokeStyle = '#000'; c.lineWidth = 2;
+    c.beginPath(); c.arc(mx, my, 5, 0, Math.PI * 2); c.fill(); c.stroke();
   }
 }
 
