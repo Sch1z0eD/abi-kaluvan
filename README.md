@@ -1,83 +1,84 @@
 <p align="center"><img src="web/docs/logo.png" width="140" alt="Merchant Ear"></p>
 
 <h1 align="center">Merchant Ear</h1>
-<p align="center"><b>Слух торговца</b> — помощник для полевого торговца в Arena Breakout: Infinite</p>
+<p align="center"><b>Hear what is inside</b> — a helper for the Field Merchant in Arena Breakout: Infinite</p>
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a></p>
 
-У полевого торговца (Field Merchant) грузы закрыты: видно только надпись, цену и размер. Но когда груз перетаскиваешь, он издаёт звук предмета внутри. Merchant Ear слушает этот звук, смотрит на сетку торговца и подсказывает:
+The Field Merchant sells closed cargo: you only see its label, price and size. But when you drag a cargo, it plays the sound of the item inside. Merchant Ear listens to that sound, watches the merchant grid and tells you:
 
-- **что может лежать в грузе** — список предметов с вероятностями;
-- **шанс красного предмета**;
-- **окупится ли покупка** — средняя стоимость против цены, шанс получить дороже, разброс;
-- **какие грузы выгоднее всего купить** в этом рейде.
+- **what the cargo may hold** — a list of items with their chances;
+- **the chance of a red item**;
+- **whether the purchase pays off** — mean value against the price, the chance to get more, the range;
+- **which cargo are the best buys** in this raid.
 
-## Возможности
+## Features
 
-- **Распознавание по звуку.** Звук перетаскивания сравнивается с библиотекой из 38 звуковых групп (189 предметов). Резкость начала звука отсекает ложные срабатывания от ветра и музыки.
-- **Груз под курсором.** Клиент передаёт положение курсора: груз, на который вы навели, подсвечивается сразу, а звук относится к тому грузу, который был под курсором в момент нажатия.
-- **Схема торговца.** Сетка находится сама, надписи читаются распознаванием текста, из прокрутки собирается схема всего списка; видимая часть обведена. После покупки схема перестраивается сама, «Искать заново» — мгновенно.
-- **Точные шансы.** Набор груза определяется по надписи, цене и размеру: в каждом наборе предметы одного размера, поэтому предметы чужого размера отбрасываются. При скидке набор определяется по зачёркнутой цене.
-- **Окупаемость и рейтинг.** Для каждого груза с известной ценой: средняя стоимость, шанс окупить, вывод «стоит брать / рискованно / не окупится». Лучшие покупки отмечаются на схеме (#1, #2…, по числу покупок за рейд: 2, 3 или 4). Оценка — по цене сдачи торговцу, полевому торговцу (+10%) или по рынку.
-- **Учёт покупок.** Строка «… spent … Koen … obtained […]» и баланс подтверждают вашу покупку; она уточняет вероятности на будущее.
-- **Оверлей.** Режим для одного монитора: маленькое окно поверх игры — схема слева, результат и рейтинг справа.
-- **Интерфейс** на украинском, английском и русском.
+- **Recognition by sound.** The drag sound is matched against a library of 38 sound groups (189 items). A sharp-attack check filters out false triggers from wind and music.
+- **Cargo under the cursor.** The client reports the cursor position: the cargo you hover is outlined at once, and a sound belongs to the cargo that was under the cursor at the moment of the click.
+- **Merchant map.** The grid is found automatically, labels are read by OCR, and a map of the whole list is built while you scroll; the part on screen is outlined. After a purchase the map rebuilds itself, and "Scan again" is instant.
+- **Exact odds.** A cargo's pool is picked by its label, price and size: every pool holds items of one size, so items of another size are ruled out. With a discount, the crossed-out price picks the pool.
+- **Payback and best buys.** For every cargo with a known price: mean value, chance to pay off, and a verdict — worth buying / a gamble / will not pay off. The best buys are badged on the map (#1, #2…, by your purchases per raid: 2, 3 or 4). Value by the trader hand-in price, the field merchant (+10%) or the market.
+- **Purchase log.** The "… spent … Koen … obtained […]" line and your balance confirm your own purchase; it refines the odds for the future.
+- **Overlay.** A one-monitor mode: a small window over the game with the map on the left and the result and best buys on the right.
+- **Interface** in Ukrainian, English and Russian.
 
-## Как устроено
+## How it works
 
-| Часть | Что делает | Где работает |
+| Part | What it does | Where it runs |
 |---|---|---|
-| [`web/`](web/README.md) | Сайт: всё распознавание (сетка, текст, звук, шансы, окупаемость) идёт в браузере | Любой веб-сервер или `localhost` |
-| [`client/`](client/README.md) | Клиент на C# (.NET 10): звук только процесса игры, кадры только её окна, положение курсора — по WebSocket | Игровой ПК с Windows |
+| [`web/`](web/README.md) | The site: all recognition (grid, text, sound, odds, payback) runs in the browser | Any web server or `localhost` |
+| [`client/`](client/README.md) | A C# client (.NET 10): sound of the game process only, frames of the game window only, the cursor position — over WebSocket | The gaming PC with Windows |
 
 ```
-[веб-сервер или localhost]  раздаёт web/
-          │ страница
+[web server or localhost]  serves web/
+          │ page
           ▼
-[игровой ПК]  браузер ──ws://localhost:8777──►  MerchantEar.Client.exe ──► звук и окно UAGame.exe
+[gaming PC]  browser ──ws://localhost:8777──►  MerchantEar.Client.exe ──► sound and window of UAGame.exe
 ```
 
-Клиент необязателен: без него сайт попросит поделиться экраном с системным звуком (Chrome или Edge на Windows). Но с клиентом звук чище, а груз под курсором определяется точно.
+The client is optional: without it the site asks you to share the screen with system audio (Chrome or Edge on Windows). With the client the sound is cleaner and the cargo under the cursor is known exactly.
 
-Клиент не читает и не изменяет память и файлы игры: он захватывает звук процесса стандартным механизмом Windows (как OBS и Discord), снимает окно игры и читает системное положение курсора.
+The client does not read or change the game's memory or files: it captures the process sound with the standard Windows mechanism (like OBS and Discord), takes pictures of the game window and reads the system cursor position.
 
-## Быстрый старт
+## Quick start
 
-Нужны Windows 10 (сборка 20348+) или 11, .NET 10 SDK, Python 3 (или любой другой простой веб-сервер) и Chrome или Edge.
+You need Windows 10 (build 20348+) or 11, the .NET 10 SDK, Python 3 (or any other simple web server) and Chrome or Edge.
 
-1. Запустите клиент:
+1. Start the client:
 
    ```bash
    cd client
    dotnet run -c Release
    ```
 
-2. Во втором окне запустите сайт:
+2. In a second window, start the site:
 
    ```bash
    cd web
    python -m http.server 8080
    ```
 
-3. Переключите игру в режим «Окно без рамки» (Borderless), откройте `http://localhost:8080/` и нажмите **«Начать ловлю»**.
-4. Откройте полевого торговца и прокрутите список — схема соберётся сама. Наведите курсор на груз, чтобы прочитать цену, и дёрните его — звук уточнит, что внутри.
+3. Switch the game to Borderless window mode, open `http://localhost:8080/` and press **Start catching**.
+4. Open the Field Merchant and scroll through the list — the map builds itself. Hover a cargo to read its price and drag it — the sound tells what is inside.
 
-Как выложить сайт на свой сервер с HTTPS и паролем — в [web/README.md](web/README.md). Настройки клиента — в [client/README.md](client/README.md).
+How to put the site on your own server with HTTPS and a password: [web/README.md](web/README.md). Client settings: [client/README.md](client/README.md).
 
-## Ограничения
+## Limits
 
-- Вероятности считаются по таблицам торговца (данные abibuilder.com / abi-tracker) и не являются живой статистикой. Окупаемость — по табличным ценам предметов.
-- Многие предметы делят один звук: внутри одной звуковой группы предмет определяется только по весам набора.
-- Надписи грузов читаются только на английском клиенте игры. Сетка, звук и цены работают на любом языке.
-- Нужен режим «Окно без рамки»: в эксклюзивном полноэкранном режиме кадр получается чёрным.
+- The odds come from the merchant tables (abibuilder.com / abi-tracker data), not from live statistics. Payback uses the table prices of the items.
+- Many items share one sound: inside a sound group the item is told apart only by the pool weights.
+- Cargo labels are read only with the English game client. The grid, sound and prices work in any language.
+- Borderless window mode is required: in exclusive fullscreen the frame comes out black.
 
-## Предупреждение
+## Disclaimer
 
-Это фанатский инструмент, не связанный с MoreFun Studios и Tencent. Слушать грузы на слух игра поощряет сама, но EULA Arena Breakout: Infinite (пункты 7(b), 7(c), 7(i)) запрещает сторонние программы, которые собирают информацию об игре или дают преимущество. Используйте на свой риск, не раздавайте сайт публично и не показывайте его на стримах.
+This is a fan-made tool, not affiliated with MoreFun Studios or Tencent. The game itself encourages listening to cargo by ear, but the Arena Breakout: Infinite EULA (sections 7(b), 7(c), 7(i)) forbids third-party programs that collect information about the game or give an advantage. Use it at your own risk, do not share the site publicly and do not show it on streams.
 
-## Авторы и лицензия
+## Credits and license
 
-Merchant Ear распространяется под лицензией **GNU GPL v3.0** — полный текст в файле [LICENSE](LICENSE). Вы можете свободно использовать, изучать, изменять и распространять программу; изменённые версии должны оставаться под той же лицензией и с исходным кодом.
+Merchant Ear is licensed under the **GNU GPL v3.0** — the full text is in [LICENSE](LICENSE). You may use, study, change and share it; changed versions must stay under the same license and come with their source code.
 
-- Merchant Ear — © 2026 Sch1z0eD. Изменённая версия: проект разделён на сайт и клиент, добавлены курсор из клиента, устойчивая связь, защита от шума, окупаемость, рейтинг и многое другое (история изменений — в git).
-- Основан на проекте ABI Kaluvan (neverh8me, GPL-3.0) — https://github.com/neverh8me/abi-kaluvan
-- [Tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0) — распознавание текста, `web/lib/tesseract`.
-- Данные торговца и иконки предметов — [abibuilder.com](https://abibuilder.com); звуки предметов — Item Sonar и записи пользователей. Звуки, иконки и данные игры принадлежат их правообладателям и под лицензию проекта не подпадают.
+- Merchant Ear — © 2026 Sch1z0eD. A modified version: split into a site and a client, with the cursor from the client, a steady connection, noise protection, payback, best buys and much more (see the git history).
+- Based on ABI Kaluvan (neverh8me, GPL-3.0) — https://github.com/neverh8me/abi-kaluvan
+- [Tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0) — text recognition, `web/lib/tesseract`.
+- Merchant data and item icons — [abibuilder.com](https://abibuilder.com); item sounds — Item Sonar and user recordings. The game's sounds, icons and data belong to their owners and are not covered by the project license.

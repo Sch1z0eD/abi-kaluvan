@@ -1,47 +1,50 @@
-# Merchant Ear — сайт (`web/`)
+# Merchant Ear — site (`web/`)
 
-Статичный сайт без сборки и без серверной части. Все вычисления идут в браузере игрока:
+**English** · [Русский](README.ru.md)
 
-| Файл | Что делает |
+A static site with no build step and no server side. All the work runs in the player's browser:
+
+| File | What it does |
 |---|---|
-| `index.html` | Интерфейс, карта сетки, вероятности, журнал покупок |
-| `config.js` | **Настройки развёртывания:** адрес клиента и общей базы покупок |
-| `vision.js` | Находит сетку торговца и груз на кадре |
-| `ocr.js`, `lib/tesseract/` | Читает надписи груза и цену (Tesseract.js 5.1.1, работает офлайн) |
-| `audio.js` | Ловит звук перетаскивания и сравнивает его с образцами |
-| `library.js`, `library/` | Звуковые группы, наборы предметов торговца с весами, иконки, образцы звуков |
-| `i18n.js` | Тексты на украинском, английском и русском |
+| `index.html` | Interface, grid map, odds, payback, purchase log |
+| `config.js` | **Deployment settings:** the client address and an optional online purchase base |
+| `migrate.js` | Moves settings saved under earlier names to the current ones, once |
+| `vision.js` | Finds the merchant grid and the cargo on a frame |
+| `ocr.js`, `lib/tesseract/` | Reads cargo labels and prices (Tesseract.js 5.1.1, works offline) |
+| `audio.js` | Catches the drag sound and matches it against the samples |
+| `library.js`, `library/` | Sound groups, merchant pools with weights, icons, sound samples |
+| `i18n.js` | Texts in Ukrainian, English and Russian |
 
-## Откуда сайт берёт звук и картинку
+## Where the site gets sound and picture
 
-1. Сначала пробует подключиться к клиенту по адресу `clientUrl` из `config.js` (по умолчанию `ws://localhost:8777`). Для одного визита адрес можно переопределить: `?client=ws://localhost:8799`.
-2. Если клиента нет — вызывает `getDisplayMedia`, и браузер просит поделиться экраном со звуком.
+1. It first tries the client at `clientUrl` from `config.js` (`ws://localhost:8777` by default). For one visit the address can be overridden: `?client=ws://localhost:8799`.
+2. Without the client it calls `getDisplayMedia`, and the browser asks you to share the screen with audio.
 
-Для работы нужен Chrome или Edge на Windows. Захват экрана браузер разрешает только по **HTTPS** или на `localhost`.
+Chrome or Edge on Windows is required. The browser allows screen capture only over **HTTPS** or on `localhost`.
 
-## Локально
+## Locally
 
 ```bash
 python -m http.server 8080
 ```
 
-Откройте `http://localhost:8080/`. Через `file://` сайт работать не будет: браузер не даст загрузить библиотеку звуков.
+Open `http://localhost:8080/`. Opened as `file://` the site does not work: the browser will not load the sound library.
 
-## На Linux-сервере (nginx)
+## On a Linux server (nginx)
 
-1. Скопируйте содержимое `web/` на сервер, например в `/var/www/merchant-ear`.
-2. Закройте сайт паролем:
+1. Copy the contents of `web/` to the server, for example to `/var/www/merchant-ear`.
+2. Protect the site with a password:
    ```bash
    sudo htpasswd -c /etc/nginx/merchant-ear.htpasswd player
    ```
-3. Добавьте сайт в nginx (пример — [`deploy/nginx.conf`](deploy/nginx.conf)) и получите сертификат:
+3. Add the site to nginx (example: [`deploy/nginx.conf`](deploy/nginx.conf)) and get a certificate:
    ```bash
    sudo certbot --nginx -d abi.example.com
    ```
-4. На игровом ПК добавьте адрес сайта в `allowedOrigins` в `appsettings.json` клиента, например `"https://abi.example.com"`. Иначе клиент откажет сайту в подключении.
+4. On the gaming PC, add the site address to `allowedOrigins` in the client's `appsettings.json`, for example `"https://abi.example.com"`. Otherwise the client refuses the site.
 
-Подключение со страницы HTTPS к `ws://localhost` браузеры разрешают: `localhost` считается безопасным адресом. Новые версии Chrome при первом подключении могут спросить разрешение на доступ к устройствам локальной сети — его нужно дать.
+Browsers allow an HTTPS page to connect to `ws://localhost`: `localhost` counts as a secure address. Recent Chrome versions may ask for permission to access devices on the local network on the first connection — allow it.
 
-## Покупки
+## Purchases
 
-Ваши покупки сохраняются только в этом браузере (localStorage) и никуда не отправляются. Если хотите подмешивать общую базу покупок из интернета, укажите её адрес в `baseRemote` в `config.js` (по умолчанию выключено).
+Your purchases are stored only in this browser (localStorage) and are not sent anywhere. To merge an online purchase base, put its address into `baseRemote` in `config.js` (off by default).
