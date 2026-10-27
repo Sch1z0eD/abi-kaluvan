@@ -1093,6 +1093,7 @@ function analyze(src, rp) {
     if (thumbOddCount >= THUMB_NEW_STREAK) sbKnown.thumbLen = sb.thumbLen;
     else sb = null;
   } else thumbOddCount = 0;
+  diag.sb = sb; diag.n = null; // for diagnostics: the scrollbar of this parse and the row number taken
   if (!sb && sbKnown) {
     // The price tooltip covered the scrollbar (a cargo near the right edge). The map is left alone, but the tooltip is still
     // read: while the cursor is on a cargo the list does not scroll, so the position is the last known one.
@@ -1132,6 +1133,7 @@ function analyze(src, rp) {
     sawTop = sawEnd = true; // the whole list is visible at once
   }
   offset = n * P - grid.y0;
+  diag.n = n;
   if (ring.length) ring[ring.length - 1].offset = offset;
   // A cargo touching the top of the visible part may be cut off by the header: the bottom border of
   // the header then acts as its top border. Such a cargo is trusted only in the first row of the list.
@@ -1823,16 +1825,10 @@ function cargoName(key) {
   return rec ? `${rec.R + 1 - mapBounds().minR}×${rec.C + 1 - mapBounds().minC}` : key;
 }
 
-// What the map shows: the cargo on screen now (the latest view), each drawn from its record (label, price, sound
-// result) but at its place on screen. Before the first view: the whole-list map.
+// What the map shows: the whole list as built so far (the cargo under the cursor is still found in the current
+// frame, see cursorCargo, so a drifting map row cannot send a sound to the wrong cargo)
 function mapEntries() {
-  if (!lastView) return placedCargo();
-  return lastView.items.map((it, i) => {
-    const key = lastView.keys[i], rec = cargo.get(key);
-    const view = rec ? Object.create(rec) : { w: it.w, h: it.h, votes: 0 };
-    view.C = it.c; view.R = it.r;
-    return [key, view];
-  });
+  return placedCargo();
 }
 
 function mapBounds() {
@@ -2035,10 +2031,16 @@ function drawMapInner() {
     decorate(key, rec, x, y, w, h);
   }
   // the mouse cursor (from the client), so it is visible that the map follows it
+  // the part of the list on screen now, outlined, so it is clear where the game view is on the whole-list map
+  if (viewport && P && lastView) {
+    const top = (viewport.y + offset) / P - minR, left = (viewport.x - phaseX) / P - minC;
+    c.save(); c.strokeStyle = 'rgba(34,211,238,.45)'; c.lineWidth = 2; c.setLineDash([3, 5]);
+    c.strokeRect(left * MAP_U + 1, top * MAP_U + 1, viewport.w / P * MAP_U - 2, viewport.h / P * MAP_U - 2);
+    c.restore();
+  }
   const cur = cursorTrack[cursorTrack.length - 1];
-  if (cur && cur.in && lastView && cur.y >= lastView.grid.y0 && cur.y < lastView.grid.y0 + lastView.grid.rows * lastView.grid.P) {
-    const g = lastView.grid;
-    const mx = ((cur.x - g.x0) / g.P - minC) * MAP_U, my = ((cur.y - g.y0) / g.P - minR) * MAP_U;
+  if (cur && cur.in && viewport && P && cur.y >= viewport.y && cur.y < viewport.y + viewport.h) {
+    const mx = ((cur.x - phaseX) / P - minC) * MAP_U, my = ((cur.y + offset) / P - minR) * MAP_U;
     c.fillStyle = '#22d3ee'; c.strokeStyle = '#000'; c.lineWidth = 2;
     c.beginPath(); c.arc(mx, my, 5, 0, Math.PI * 2); c.fill(); c.stroke();
   }
