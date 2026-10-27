@@ -8,167 +8,184 @@
 <title>Merchant Ear</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link id="fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Saira+Semi+Condensed:wght@500;600;700&display=swap">
+<link id="fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700&family=Titillium+Web:wght@400;600;700&display=swap">
 <style>
-  /* Merchant Ear: the look of the in-raid merchant panel. Near-black panels with thin grey slot borders, square
-     corners, condensed caps for headings and numbers, one orange accent (the merchant's Purchase button) and the
-     game's rarity colors for items. Layout: header bar; result card and merchant map side by side; tools below. */
+  /* Merchant Ear. Subject: a helper glanced at mid-raid next to the Field Merchant; its job is the buy decision.
+     Charcoal with a faint olive cast (raid gear), the merchant's orange as the only accent, the game's rarity colors
+     for items. Oxanium for titles and big numbers (squared, like the game's HUD), Titillium Web for text; sentence
+     case throughout. Radius follows hierarchy: cards 14, rows and slots 10, controls 8. The verdict in the result
+     card is the one loud element. Layout: header bar; result card and merchant map side by side; tools below. */
   :root {
-    --bg: #0c0d0e;          /* the screen behind the panels */
-    --panel: #141516;       /* a merchant panel */
-    --slot: #1a1b1d;        /* an inventory slot */
-    --line: #34373a;        /* slot and panel borders */
-    --line-soft: #242628;
-    --text: #dcdcd7;
-    --muted: #8a8d8b;
-    --accent: #e8642c;      /* Purchase orange */
-    --accent-ink: #1a0d06;
-    --accent-dim: #3a1c10;  /* the active tab behind Purchase */
-    --good: #62b35a; --warn: #d6a136; --bad: #d9443b;
-    --font-ui: "Saira Semi Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
-    --font-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --bg: #0d0f0e;
+    --surface: #141816;      /* a card */
+    --raised: #1b201c;       /* rows, slots, inputs inside a card */
+    --hover: #222823;
+    --line: #2b322d;
+    --line-strong: #3d463f;
+    --text: #e6e9e3;
+    --text-2: #a6aea7;
+    --text-3: #7d877f;
+    --accent: #ef8a3a;       /* the merchant's Purchase orange */
+    --accent-ink: #1f1004;
+    --accent-soft: rgba(239, 138, 58, .12);
+    --accent-line: rgba(239, 138, 58, .42);
+    --good: #61c27c; --good-soft: rgba(97, 194, 124, .13);
+    --warn: #e3b341;
+    --bad: #ec5b4f;
+    --font-display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Titillium Web", "Segoe UI", system-ui, sans-serif;
+    --r-card: 14px; --r-row: 10px; --r-ctl: 8px;
+    --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 14px 34px -16px rgba(0, 0, 0, .7);
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font-body); }
+  body {
+    margin: 0; color: var(--text); font: 15px/1.5 var(--font-body);
+    /* a faint tactical grid, like a raid map */
+    background: var(--bg) linear-gradient(rgba(239, 138, 58, .028) 1px, transparent 1px) 0 0 / 40px 40px,
+                var(--bg) linear-gradient(90deg, rgba(239, 138, 58, .028) 1px, transparent 1px) 0 0 / 40px 40px;
+    background-color: var(--bg);
+  }
   a { color: var(--accent); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* Header: brand, the catch controls, status, display mode and language */
-  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  /* Header */
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-    background: #101112; border-bottom: 1px solid var(--line); }
-  .brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
-  .brand img { width: 28px; height: 28px; display: block; }
-  header h1 { margin: 0; font: 700 19px/1 var(--font-ui); letter-spacing: .04em; text-transform: uppercase; }
-  header .status { color: var(--muted); font-size: 13px; padding: 3px 10px; border: 1px solid var(--line-soft); background: var(--panel); }
+    background: rgba(13, 15, 14, .88); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: 8px; }
+  .brand img { width: 30px; height: 30px; display: block; }
+  header h1 { margin: 0; font: 700 19px/1 var(--font-display); letter-spacing: .01em; }
+  header .status { color: var(--text-2); font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); }
 
-  /* Panels: a title strip like the merchant's Mysterious Supplies bar, then the content */
-  section { background: var(--panel); border: 1px solid var(--line); padding: 0 14px 14px; margin-bottom: 14px; }
-  section > h2 { margin: 0 -14px 12px; padding: 7px 14px; font: 600 13px/1.2 var(--font-ui); text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text); background: #1c1d1f; border-bottom: 1px solid var(--line); }
-  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start;
-    padding-block: 14px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  .top .result-col { position: sticky; top: 64px; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px;
+  /* Cards */
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); box-shadow: var(--shadow);
+    padding: 16px; margin-bottom: 16px; }
+  section > h2 { margin: 0 0 12px; font: 600 16px/1.25 var(--font-display); color: var(--text); }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
+    padding-block: 16px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .top .result-col { position: sticky; top: 68px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px;
     padding-block: 0 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   @media (max-width: 960px) { .top, main { grid-template-columns: 1fr; } .top .result-col { position: static; } }
 
-  /* Controls: square, condensed caps; the main action is the merchant's orange */
-  button { background: #222426; color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 7px 14px;
-    font: 600 13px/1.2 var(--font-ui); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
-  button:hover { background: #2b2d30; border-color: #4a4d51; }
-  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  button.primary:hover { background: #f07238; }
+  /* Controls */
+  button { background: var(--raised); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+    padding: 8px 14px; font: 600 14px/1.2 var(--font-body); cursor: pointer; transition: background .14s, border-color .14s, box-shadow .14s; }
+  button:hover { background: var(--hover); border-color: #4c564e; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 6px 18px -8px var(--accent-line); }
+  button.primary:hover { background: #f59a50; box-shadow: 0 8px 22px -8px var(--accent); }
   button.danger { color: var(--bad); }
-  button.small { padding: 3px 8px; font-size: 11px; }
-  button:disabled { opacity: .4; cursor: default; }
-  select, input[type=text], input[type=number] { background: var(--slot); color: var(--text); border: 1px solid var(--line);
-    border-radius: 0; padding: 6px 8px; font: 14px var(--font-body); min-width: 0; }
-  label { color: var(--muted); }
-  input[type=range] { width: 140px; accent-color: var(--accent); }
-  input[type=checkbox] { accent-color: var(--accent); }
+  button.small { padding: 4px 9px; font-size: 12px; border-radius: 6px; }
+  button:disabled { opacity: .4; cursor: default; box-shadow: none; }
+  select, input[type=text], input[type=number] { background: var(--raised); color: var(--text); border: 1px solid var(--line-strong);
+    border-radius: var(--r-ctl); padding: 7px 10px; font: 14px var(--font-body); min-width: 0; }
+  label { color: var(--text-2); }
+  input[type=range], input[type=checkbox] { accent-color: var(--accent); }
+  input[type=range] { width: 140px; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .lang { margin-left: auto; }
-  .muted { color: var(--muted); }
+  .muted { color: var(--text-3); }
 
-  canvas { width: 100%; display: block; background: var(--bg); }
-  #map { cursor: pointer; width: auto; max-width: 100%; margin: 0 auto; }
-  .map-wrap { max-height: calc(100vh - 170px); overflow: auto; border: 1px solid var(--line-soft); background: var(--bg); }
+  canvas { width: 100%; display: block; background: var(--bg); border-radius: var(--r-row); }
+  #map { cursor: pointer; width: auto; max-width: 100%; margin: 0 auto; border-radius: 0; }
+  .map-wrap { max-height: calc(100vh - 180px); overflow: auto; border-radius: var(--r-row); background: var(--bg); border: 1px solid var(--line); padding: 4px; }
 
-  /* Stage of the map: what to do now, and the map buttons */
-  .stage { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 12px; margin-bottom: 10px;
-    background: var(--accent-dim); border-left: 3px solid var(--accent); }
-  .stage .title { font: 700 17px/1.2 var(--font-ui); color: #ffb48a; text-transform: uppercase; letter-spacing: .03em; }
-  .stage .grow { flex: 1; color: #d9b9a6; font-size: 13px; }
+  /* What to do now on the map */
+  .stage { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px;
+    border-radius: var(--r-row); background: var(--accent-soft); border: 1px solid var(--accent-line); }
+  .stage .title { font: 600 17px/1.25 var(--font-display); color: var(--accent); }
+  .stage .grow { flex: 1; color: var(--text-2); font-size: 13px; }
 
-  /* Result card */
-  #result { padding: 16px; background: var(--slot); border: 1px solid var(--line); min-height: 150px; transition: border-color .15s, background .15s; }
-  #result .big { font: 700 38px/1.05 var(--font-ui); text-transform: uppercase; letter-spacing: .01em; }
-  #result .sub { color: var(--muted); margin: 6px 0 12px; }
-  .chance { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid; margin: 12px 0;
-    font-family: var(--font-ui); text-transform: uppercase; letter-spacing: .04em; font-size: 13px; }
-  .chance b { font-size: 20px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  /* Result card: the verdict is the loud element */
+  #result { padding: 18px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-row); min-height: 150px; transition: border-color .2s, background .2s; }
+  #result .big { font: 700 40px/1.05 var(--font-display); letter-spacing: -.01em; text-wrap: balance; }
+  #result .sub { color: var(--text-2); margin: 8px 0 12px; }
+  .chance { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid; border-radius: var(--r-row); margin: 12px 0; }
+  .chance b { font: 700 22px var(--font-display); font-variant-numeric: tabular-nums; }
   .sizes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .size { border: 1px solid var(--line); padding: 2px 8px; font: 500 13px var(--font-ui); font-variant-numeric: tabular-nums; }
-  .size.on { background: #ffffff10; outline: 1px solid var(--text); }
-  .payback { margin-top: 10px; padding: 9px 12px; border: 1px solid; display: grid; gap: 3px; font-size: 13px; }
-  .payback b { font: 700 14px var(--font-ui); text-transform: uppercase; letter-spacing: .05em; }
+  .size { border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 9px; font: 500 13px var(--font-display); font-variant-numeric: tabular-nums; }
+  .size.on { background: var(--hover); border-color: var(--text-2); }
+  .payback { margin-top: 10px; padding: 11px 14px; border: 1px solid; border-radius: var(--r-row); display: grid; gap: 3px; font-size: 14px; }
+  .payback b { font: 700 16px var(--font-display); }
 
-  /* Item slots: square cells with the rarity strip, like the stash */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; margin-top: 12px; }
-  .tile { background: #121314; border: 1px solid var(--line); padding: 8px 6px 6px; text-align: center; }
-  .tile img { width: 68px; height: 68px; object-fit: contain; display: block; margin: 0 auto; }
-  .tile .noimg { height: 68px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
-  .tile i { display: block; height: 3px; margin: 6px 4px; }
-  .tile b { font: 600 15px var(--font-ui); font-variant-numeric: tabular-nums; }
+  /* Item slots with the rarity strip, like the stash */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-row); padding: 9px 6px 7px; text-align: center; }
+  .tile img { width: 66px; height: 66px; object-fit: contain; display: block; margin: 0 auto; }
+  .tile .noimg { height: 66px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-3); }
+  .tile i { display: block; height: 3px; border-radius: 2px; margin: 7px 8px 6px; }
+  .tile b { font: 600 15px var(--font-display); font-variant-numeric: tabular-nums; }
 
-  /* Best buys under the map */
-  .rank { margin-top: 10px; display: grid; gap: 4px; font-size: 13px; }
-  .rank > .muted { font: 600 12px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; }
-  .rank .row { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; margin: 0; background: var(--slot); border: 1px solid var(--line-soft); }
-  .rank .row.top { border-color: #3c5a38; background: #182417; }
-  .rank .row b { min-width: 2.2em; font-family: var(--font-ui); color: var(--good); }
+  /* Best buys: list rows with a strip on the left, like the finds list of a stash */
+  .rank { margin-top: 12px; display: grid; gap: 6px; font-size: 14px; }
+  .rank > .muted { color: var(--text-2); font: 600 14px var(--font-display); }
+  .rank .row { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; margin: 0; border-radius: var(--r-row);
+    background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--line-strong); }
+  .rank .row.top { border-left-color: var(--good); background: linear-gradient(90deg, var(--good-soft), var(--raised) 60%); }
+  .rank .row b { min-width: 2em; font: 700 15px var(--font-display); color: var(--good); }
   .rank .grow { flex: 1; min-width: 0; }
 
   /* Map popup */
-  .map-pop { position: fixed; z-index: 10; width: 340px; background: #111213; border: 1px solid #4a4d51; padding: 12px; box-shadow: 0 10px 30px #000c; pointer-events: none; }
-  .map-pop .head { color: var(--muted); font-size: 13px; }
+  .map-pop { position: fixed; z-index: 10; width: 340px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-card);
+    padding: 14px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .8); pointer-events: none; }
+  .map-pop .head { color: var(--text-2); font-size: 13px; }
   .map-pop .tiles { grid-template-columns: repeat(3, 1fr); }
   .map-pop .tile img { width: 54px; height: 54px; }
 
   /* Tools below: level, log, sound library, help */
-  #log { max-height: 190px; overflow: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  #log div { padding: 1px 0; border-bottom: 1px solid #ffffff06; }
-  .help { padding-left: 20px; }
+  #log { max-height: 190px; overflow: auto; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  #log div { padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, .03); }
+  .help { padding-left: 20px; color: var(--text-2); }
   .help li { margin-bottom: 6px; max-width: 70ch; }
-  .sound { border: 1px solid var(--line-soft); background: var(--slot); padding: 10px; margin-bottom: 8px; }
+  .help b { color: var(--text); }
+  .sound { border: 1px solid var(--line); background: var(--raised); border-radius: var(--r-row); padding: 10px 12px; margin-bottom: 8px; }
   .sound.recording { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
   .sound.hit { border-color: var(--accent); }
   .sound-head { display: flex; align-items: center; gap: 8px; }
-  .sound-head .grow { flex: 1; font: 600 14px var(--font-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sound .meta { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
-  .item-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 13px; }
+  .sound-head .grow { flex: 1; font: 600 15px var(--font-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sound .meta { color: var(--text-3); font-size: 13px; margin: 4px 0 8px; }
+  .item-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 14px; }
   .item-row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item-row img { width: 24px; height: 24px; object-fit: contain; background: var(--bg); }
+  .item-row img { width: 24px; height: 24px; object-fit: contain; background: var(--bg); border-radius: 4px; }
   .add-item { display: grid; grid-template-columns: 1fr 96px 74px 50px auto; gap: 6px; margin-top: 8px; }
-  details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  details summary { cursor: pointer; font-size: 13px; color: var(--text-3); }
   .odds { margin-top: 12px; }
-  .odds-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; border-bottom: 1px solid #ffffff0a; }
+  .odds-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 14px; border-bottom: 1px solid rgba(255, 255, 255, .04); }
   .odds-row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .odds-row img { width: 24px; height: 24px; object-fit: contain; }
   .odds-row b { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
   .bars div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .bars .bar { flex: 1; height: 10px; background: var(--slot); overflow: hidden; }
+  .bars .bar { flex: 1; height: 10px; background: var(--raised); border-radius: 5px; overflow: hidden; }
   .bars .bar i { display: block; height: 100%; }
   .bars .name { width: 100px; }
   .bars .val { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
   .items { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: var(--slot); border: 1px solid var(--line); font-size: 13px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); font-size: 13px; }
   .chip img { width: 28px; height: 28px; object-fit: contain; }
   .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-  .credits { text-align: center; color: var(--muted); font: 500 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase;
-    padding-block: 6px 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .credits { text-align: center; color: var(--text-3); font-size: 13px;
+    padding-block: 4px 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
   /* Overlay window (one monitor): the map on the left; stage, result and best buys on the right */
   .overlay { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 0.95fr); gap: 8px; height: 100vh; background: var(--bg); }
   .overlay .ov-map, .overlay .ov-side { min-height: 0; overflow: auto; }
   .overlay .ov-side { display: flex; flex-direction: column; gap: 8px; }
   .overlay .ov-side > * { flex: none; } /* the column scrolls; its blocks keep their height */
-  .overlay .stage { padding: 6px 10px; gap: 6px; margin: 0; }
+  .overlay .stage { padding: 7px 10px; gap: 6px; margin: 0; }
   .overlay .stage .title { font-size: 15px; }
   .overlay .stage .grow { display: none; }
-  .overlay #result { padding: 10px; min-height: 0; }
-  .overlay #result .big { font-size: 22px; }
-  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 4px; }
-  .overlay .tile { padding: 4px 3px 3px; }
+  .overlay #result { padding: 12px; min-height: 0; }
+  .overlay #result .big { font-size: 24px; }
+  .overlay .tiles { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 5px; }
+  .overlay .tile { padding: 5px 3px 4px; border-radius: 8px; }
   .overlay .tile img { width: 40px; height: 40px; }
   .overlay .tile b { font-size: 13px; }
   .overlay .tiles .tile:nth-child(n+9) { display: none; } /* the 8 most likely items: the best buys stay in view */
   .overlay .map-wrap { max-height: none; }
-  .overlay .rank { margin-top: 0; font-size: 12px; }
-  .overlay .rank .row { flex-wrap: wrap; gap: 4px 8px; padding: 5px 8px; }
-  @media (prefers-reduced-motion: reduce) { #result { transition: none; } }
+  .overlay .rank { margin-top: 0; font-size: 13px; }
+  .overlay .rank .row { flex-wrap: wrap; gap: 4px 8px; padding: 6px 10px; }
+  @media (prefers-reduced-motion: reduce) { #result, button { transition: none; } }
 </style>
 </head>
 <body>
@@ -299,6 +316,7 @@ const RING_MS = 3000;        // how much frame history to keep
 const OCC_GREY = 0.3;        // share of "grey" in a cell to count it as cargo (empty slots are black)
 const PICK_MIN_DIFF = 4;     // minimal cargo change (0–255) to count it as dragged
 const RED_MIN = 3;           // minimal "redness" of the trace where a cargo was dragged
+const MAP_R = 6;             // corner radius of a cargo on the map
 const MAP_U = 56;            // map unit size
 const SCAN_MS = 150;         // how often to parse the grid once the map is ready (price tooltips are noticed sooner)
 const SCAN_FAST_MS = 45;     // and during the scan: every cargo must collect its votes while visible
@@ -322,9 +340,9 @@ const TAP_BLOCK = 512;       // how many audio samples to pass from the audio st
 
 // The page palette for canvas drawing and generated cards (the same colors as the CSS tokens)
 const UI = {
-  bg: '#0c0d0e', slot: '#1a1b1d', line: '#34373a', lineSoft: '#242628', text: '#dcdcd7', muted: '#8a8d8b',
-  accent: '#e8642c', good: '#62b35a', warn: '#d6a136', bad: '#d9443b', cursor: '#4fc9de',
-  purple: '#9b6bd3', blue: '#4a86d6', white: '#c9cbcc',
+  bg: '#0d0f0e', slot: '#1b201c', line: '#3d463f', lineSoft: '#2b322d', text: '#e6e9e3', muted: '#7d877f',
+  accent: '#ef8a3a', good: '#61c27c', warn: '#e3b341', bad: '#ec5b4f', cursor: '#5ab8ff',
+  purple: '#a77be0', blue: '#5a9cf0', white: '#cfd4cf',
 };
 
 const QUALITIES = [
@@ -1965,6 +1983,13 @@ function drawMap() {
   }
 }
 
+// A map cargo: a rounded box, like the slots of the page
+function box(c, x, y, w, h, fill = false) {
+  c.beginPath();
+  if (c.roundRect) c.roundRect(x, y, w, h, MAP_R); else c.rect(x, y, w, h);
+  if (fill) c.fill(); else c.stroke();
+}
+
 function drawMapInner() {
   const { minC, minR, maxC, maxR, placed } = mapBounds();
   const W = placed.length ? Math.min(20, Math.max(1, maxC - minC)) * MAP_U : 360;
@@ -2008,7 +2033,7 @@ function drawMapInner() {
     if (key && key === hoverKey) {
       c.save();
       c.strokeStyle = UI.cursor; c.lineWidth = 3; c.setLineDash([6, 4]);
-      c.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+      box(c, x + 1.5, y + 1.5, w - 3, h - 3);
       c.restore();
     }
   };
@@ -2017,16 +2042,16 @@ function drawMapInner() {
     const key = keyOf.get(rec);
     const x = (rec.C - minC) * MAP_U, y = (rec.R - minR) * MAP_U, w = rec.w * MAP_U, h = rec.h * MAP_U;
     c.fillStyle = UI.slot;
-    c.fillRect(x + 2, y + 2, w - 4, h - 4);
+    box(c, x + 2, y + 2, w - 4, h - 4, true);
     if (rec.thumb) { c.globalAlpha = 0.35; c.drawImage(rec.thumb, x + 2, y + 2, w - 4, h - 4); c.globalAlpha = 1; }
 
     if (rec.bought) {
       // already bought: dimmed, with what dropped
-      c.fillStyle = 'rgba(12,13,14,.7)';
-      c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = 'rgba(13,15,14,.7)';
+      box(c, x + 2, y + 2, w - 4, h - 4, true);
       if (rec.bought.img) { c.globalAlpha = 0.6; drawItemIcon(c, rec.bought, x + 8, y + 8, w - 16, h - 16); c.globalAlpha = 1; }
       c.strokeStyle = UI.line; c.lineWidth = 1;
-      c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+      box(c, x + 2.5, y + 2.5, w - 5, h - 5);
       c.fillStyle = UI.good; c.font = 'bold 14px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText('✓', x + 6, y + 4);
       continue;
@@ -2041,14 +2066,14 @@ function drawMapInner() {
       // few others; Household Items 100k has two reds at ~0.1%, that is not worth a highlight)
       const pre = label && label.category && !revealed ? cargoRedOdds(rec) : null;
       if (label && label.category && !revealed && !(pre && pre.red >= CATEGORY_RED_MIN)) {
-        c.fillStyle = 'rgba(12,13,14,.6)';
-        c.fillRect(x + 2, y + 2, w - 4, h - 4);
+        c.fillStyle = 'rgba(13,15,14,.6)';
+        box(c, x + 2, y + 2, w - 4, h - 4, true);
         c.strokeStyle = UI.lineSoft; c.lineWidth = 1;
-        c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+        box(c, x + 2.5, y + 2.5, w - 5, h - 5);
       } else if (label && label.category && !revealed) {
         // a category cargo that may hold a red: amber border with its short name
         c.strokeStyle = UI.warn; c.lineWidth = 2;
-        c.strokeRect(x + 3, y + 3, w - 6, h - 6);
+        box(c, x + 3, y + 3, w - 6, h - 6);
         c.font = 'bold 10px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
         const text = rec.w > 1 ? label.name.split(' ')[0] : label.name.slice(0, 4);
         c.lineWidth = 3; c.strokeStyle = '#000';
@@ -2059,7 +2084,7 @@ function drawMapInner() {
         // Mystery Cargo: may hold a red; border and caption by tier
         const tier = MYSTERY_TIERS[label.mystery];
         c.strokeStyle = tier.color; c.lineWidth = 2;
-        c.strokeRect(x + 3, y + 3, w - 6, h - 6);
+        box(c, x + 3, y + 3, w - 6, h - 6);
         c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
         const text = rec.w > 1 ? tier.short : tier.tiny;
         c.lineWidth = 3; c.strokeStyle = '#000';
@@ -2069,15 +2094,15 @@ function drawMapInner() {
       } else if (revealed) {
         // intel: the game itself showed the quality
         c.fillStyle = revealed.color + '55';
-        c.fillRect(x + 2, y + 2, w - 4, h - 4);
+        box(c, x + 2, y + 2, w - 4, h - 4, true);
         c.strokeStyle = revealed.color; c.lineWidth = 3;
-        c.strokeRect(x + 3, y + 3, w - 6, h - 6);
+        box(c, x + 3, y + 3, w - 6, h - 6);
         c.font = 'bold 11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
         c.fillStyle = revealed.color;
         c.fillText(qName(revealed), x + w / 2, y + h - 4);
       } else {
         c.strokeStyle = UI.line; c.lineWidth = 1;
-        c.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+        box(c, x + 2.5, y + 2.5, w - 5, h - 5);
       }
       c.fillStyle = UI.muted; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText('?', x + 6, y + 5);
@@ -2102,7 +2127,7 @@ function drawMapInner() {
     const cands = itemOdds(sound, size, info).filter(x => x.p >= 0.02);
     const top = cands.slice().sort((a, b) => b.p - a.p)[0];
     c.fillStyle = red > 0 ? 'rgba(110,30,26,.55)' : UI.slot;
-    c.fillRect(x + 2, y + 2, w - 4, h - 4);
+    box(c, x + 2, y + 2, w - 4, h - 4, true);
     if (top && (cands.length === 1 || top.p >= 0.995)) {
       drawItemIcon(c, top.it, x + 6, y + 4, w - 12, h - 16);
       c.fillStyle = qById[top.it.q].color;
@@ -2123,14 +2148,14 @@ function drawMapInner() {
     }
     const color = red > 0 ? UI.bad : UI.line;
     c.strokeStyle = key === lastKey ? UI.warn : color; c.lineWidth = key === lastKey || red > 0 ? 3 : 1;
-    c.strokeRect(x + 3, y + 3, w - 6, h - 6);
+    box(c, x + 3, y + 3, w - 6, h - 6);
     decorate(key, rec, x, y, w, h);
   }
   // the mouse cursor (from the client), so it is visible that the map follows it
   // the part of the list on screen now, outlined, so it is clear where the game view is on the whole-list map
   if (viewport && P && lastView) {
     const top = (viewport.y + offset) / P - minR, left = (viewport.x - phaseX) / P - minC;
-    c.save(); c.strokeStyle = 'rgba(79,201,222,.45)'; c.lineWidth = 2; c.setLineDash([3, 5]);
+    c.save(); c.strokeStyle = 'rgba(90,184,255,.45)'; c.lineWidth = 2; c.setLineDash([3, 5]);
     c.strokeRect(left * MAP_U + 1, top * MAP_U + 1, viewport.w / P * MAP_U - 2, viewport.h / P * MAP_U - 2);
     c.restore();
   }
