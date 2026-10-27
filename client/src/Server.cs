@@ -1,4 +1,4 @@
-// ABI Kaluvan Client server: streams the game sound and the game window to the site over WebSocket.
+// Merchant Ear Client server: streams the game sound and the game window to the site over WebSocket.
 // It serves no files: the site lives separately (web/), on any server or on localhost.
 // Only pages from the allowed origins (settings: allowedOrigins) may connect, so a random site
 // opened in the same browser cannot get the game picture or sound.
@@ -10,7 +10,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 
-namespace AbiKaluvan.Client
+namespace MerchantEar.Client
 {
     public static class Server
     {

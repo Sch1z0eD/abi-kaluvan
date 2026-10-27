@@ -4,7 +4,7 @@
 const I18n = (() => {
   const DICT = {
     uk: {
-      'app': 'ABI Kaluvan',
+      'app': 'Merchant Ear',
       'btn.start': 'Почати ловлю', 'btn.stop': 'Зупинити', 'status.idle': 'Не запущено',
       'h.result': 'Результат', 'result.wait': 'Чекаю на звук…',
       'btn.done': 'Готово', 'btn.rescan': 'Шукати заново',
@@ -20,7 +20,7 @@ const I18n = (() => {
       'ph.newName': 'Назва звуку, напр. «Скло»', 'btn.add': 'Додати',
       'btn.export': 'Експорт', 'btn.import': 'Імпорт', 'btn.clear': 'Очистити все',
       'h.help': 'Як користуватись',
-      'help.1': 'Запусти <b>ABI Kaluvan Client</b> (звук і картинка лише гри). Без нього сайт попросить поділитися екраном. Сторінку відкрий на другому моніторі або тримай під рукою через Alt+Tab.',
+      'help.1': 'Запусти <b>Merchant Ear Client</b> (звук і картинка лише гри). Без нього сайт попросить поділитися екраном. Сторінку відкрий на другому моніторі або тримай під рукою через Alt+Tab.',
       'help.2': 'Натисни «Почати ловлю». Із запущеним клієнтом браузер нічого не питає; без нього вибери «Весь екран» і «Поділитися системним аудіо». Гра має бути в режимі «Вікно без рамки» (Borderless).',
       'help.3': '<b>Сітка.</b> Відкрий торговця (список нагорі), курсор поза сіткою. Сайт сам знайде сітку й прочитає написи вантажів. Повільно прокрути список до кінця — схема заморозиться сама.',
       'help.4': '<b>Наведи.</b> Наведи курсор на вантаж — сайт прочитає назву й ціну з рамки й покаже шанс краснухи ще до смикання.',
@@ -29,7 +29,7 @@ const I18n = (() => {
       'help.7': '<b>Купив?</b> Схема лишається як була. Натисни <b>Шукати заново</b> і прогорни список ще раз.',
       'help.note': 'Усе зберігається в браузері. Через «Експорт» базу можна передати друзям.',
       'status.cancelled': 'Скасовано: {msg}',
-      'status.noAudio': 'Немає звуку! Вибери «Весь екран» і постав галочку «Поділитися системним аудіо». Або запусти ABI Kaluvan Client — тоді звук береться лише з гри.',
+      'status.noAudio': 'Немає звуку! Вибери «Весь екран» і постав галочку «Поділитися системним аудіо». Або запусти Merchant Ear Client — тоді звук береться лише з гри.',
       'status.audioClosed': 'Звʼязок зі звуком клієнта втрачено, перепідключаюсь…',
       'status.listenAll': 'Слухаю весь звук ПК ({rate} Гц)', 'status.listening': 'Слухаю',
       'status.game': 'Слухаю лише гру (UAGame.exe)', 'status.wait': 'Гра не запущена — чекаю UAGame.exe',
@@ -81,7 +81,7 @@ const I18n = (() => {
       'q.red': 'Червоний', 'q.gold': 'Золотий', 'q.purple': 'Фіолетовий', 'q.blue': 'Синій', 'q.green': 'Зелений', 'q.white': 'Білий',
     },
     en: {
-      'app': 'ABI Kaluvan',
+      'app': 'Merchant Ear',
       'btn.start': 'Start catching', 'btn.stop': 'Stop', 'status.idle': 'Not running',
       'h.result': 'Result', 'result.wait': 'Waiting for a sound…',
       'btn.done': 'Done', 'btn.rescan': 'Scan again',
@@ -97,7 +97,7 @@ const I18n = (() => {
       'ph.newName': 'Sound name, e.g. "Glass"', 'btn.add': 'Add',
       'btn.export': 'Export', 'btn.import': 'Import', 'btn.clear': 'Clear all',
       'h.help': 'How to use',
-      'help.1': 'Run <b>ABI Kaluvan Client</b> (game-only sound and picture). Without it the site asks to share the screen. Keep the page on a second monitor or reach it with Alt+Tab.',
+      'help.1': 'Run <b>Merchant Ear Client</b> (game-only sound and picture). Without it the site asks to share the screen. Keep the page on a second monitor or reach it with Alt+Tab.',
       'help.2': 'Press "Start catching". With the client running the browser asks nothing; without it pick "Entire screen" and "Share system audio". The game must run in Borderless window mode.',
       'help.3': '<b>Grid.</b> Open the merchant (list at the top), cursor off the grid. The site finds the grid and reads cargo labels by itself. Scroll the list slowly to the end — the map freezes on its own.',
       'help.4': '<b>Hover.</b> Hover a cargo — the site reads its name and price from the tooltip and shows the red chance before you drag it.',
@@ -106,7 +106,7 @@ const I18n = (() => {
       'help.7': '<b>Bought something?</b> The map stays as it was. Press <b>Scan again</b> and scroll the list once more.',
       'help.note': 'Everything is stored in the browser. Use "Export" to share the base with friends.',
       'status.cancelled': 'Cancelled: {msg}',
-      'status.noAudio': 'No audio! Pick "Entire screen" and tick "Share system audio". Or run ABI Kaluvan Client — then only the game sound is used.',
+      'status.noAudio': 'No audio! Pick "Entire screen" and tick "Share system audio". Or run Merchant Ear Client — then only the game sound is used.',
       'status.audioClosed': 'Lost the client sound, reconnecting…',
       'status.listenAll': 'Listening to all PC audio ({rate} Hz)', 'status.listening': 'Listening',
       'status.game': 'Listening to the game only (UAGame.exe)', 'status.wait': 'Game not running — waiting for UAGame.exe',
@@ -158,7 +158,7 @@ const I18n = (() => {
       'q.red': 'Red', 'q.gold': 'Gold', 'q.purple': 'Purple', 'q.blue': 'Blue', 'q.green': 'Green', 'q.white': 'White',
     },
     ru: {
-      'app': 'ABI Kaluvan',
+      'app': 'Merchant Ear',
       'btn.start': 'Начать ловлю', 'btn.stop': 'Остановить', 'status.idle': 'Не запущено',
       'h.result': 'Результат', 'result.wait': 'Жду звук…',
       'btn.done': 'Готово', 'btn.rescan': 'Искать заново',
@@ -174,7 +174,7 @@ const I18n = (() => {
       'ph.newName': 'Название звука, напр. «Стекло»', 'btn.add': 'Добавить',
       'btn.export': 'Экспорт', 'btn.import': 'Импорт', 'btn.clear': 'Очистить всё',
       'h.help': 'Как пользоваться',
-      'help.1': 'Запусти <b>ABI Kaluvan Client</b> (звук и картинка только игры). Без него сайт попросит поделиться экраном. Страницу открой на втором мониторе или держи под рукой через Alt+Tab.',
+      'help.1': 'Запусти <b>Merchant Ear Client</b> (звук и картинка только игры). Без него сайт попросит поделиться экраном. Страницу открой на втором мониторе или держи под рукой через Alt+Tab.',
       'help.2': 'Нажми «Начать ловлю». С запущенным клиентом браузер ничего не спрашивает; без него выбери «Весь экран» и «Поделиться системным звуком». Игра должна быть в режиме «Окно без рамки» (Borderless).',
       'help.3': '<b>Сетка.</b> Открой торговца (список наверху), курсор вне сетки. Сайт сам найдёт сетку и прочитает надписи грузов. Медленно прокрути список до конца — схема заморозится сама.',
       'help.4': '<b>Наведи.</b> Наведи курсор на груз — сайт прочитает название и цену из рамки и покажет шанс красного ещё до перетаскивания.',
@@ -183,7 +183,7 @@ const I18n = (() => {
       'help.7': '<b>Купил?</b> Схема остаётся как была. Нажми <b>Искать заново</b> и пролистай список ещё раз.',
       'help.note': 'Всё хранится в браузере. Через «Экспорт» базу можно передать друзьям.',
       'status.cancelled': 'Отменено: {msg}',
-      'status.noAudio': 'Нет звука! Выбери «Весь экран» и поставь галочку «Поделиться системным звуком». Или запусти ABI Kaluvan Client — тогда звук берётся только из игры.',
+      'status.noAudio': 'Нет звука! Выбери «Весь экран» и поставь галочку «Поделиться системным звуком». Или запусти Merchant Ear Client — тогда звук берётся только из игры.',
       'status.audioClosed': 'Связь со звуком клиента потеряна, переподключаюсь…',
       'status.listenAll': 'Слушаю весь звук ПК ({rate} Гц)', 'status.listening': 'Слушаю',
       'status.game': 'Слушаю только игру (UAGame.exe)', 'status.wait': 'Игра не запущена — жду UAGame.exe',
@@ -236,7 +236,7 @@ const I18n = (() => {
     },
   };
   const LOCALE = { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' };
-  const KEY = 'abi-ear-lang-v1';
+  const KEY = 'merchant-ear-lang-v1';
   let lang = 'en';
   try { lang = JSON.parse(localStorage.getItem(KEY)) || 'en'; } catch {}
   if (!DICT[lang]) lang = 'en';

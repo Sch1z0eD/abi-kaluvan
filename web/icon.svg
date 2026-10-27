@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Merchant Ear: a mystery cargo crate that "sounds" — the sound waves tell what is inside -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2230"/>
+      <stop offset="1" stop-color="#0d1118"/>
+    </linearGradient>
+    <linearGradient id="crate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6c453"/>
+      <stop offset="1" stop-color="#d9921a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="51.5" fill="none" stroke="#2c3647" stroke-width="3"/>
+  <!-- crate -->
+  <g transform="translate(34 70)">
+    <rect x="0" y="0" width="118" height="118" rx="14" fill="url(#crate)"/>
+    <rect x="0" y="0" width="118" height="118" rx="14" fill="none" stroke="#7a4b07" stroke-width="6"/>
+    <path d="M10 10 L108 108 M108 10 L10 108" stroke="#a8650c" stroke-width="10" stroke-linecap="round" opacity=".55"/>
+    <rect x="0" y="48" width="118" height="22" fill="#b8740f"/>
+    <rect x="0" y="48" width="118" height="22" fill="none" stroke="#7a4b07" stroke-width="5"/>
+    <text x="59" y="66" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="900" font-size="22" fill="#fff4d6">?</text>
+  </g>
+  <!-- sound waves -->
+  <g fill="none" stroke="#22d3ee" stroke-linecap="round">
+    <path d="M168 104 Q184 129 168 154" stroke-width="12"/>
+    <path d="M190 86 Q218 129 190 172" stroke-width="12" opacity=".75"/>
+    <path d="M212 70 Q250 129 212 188" stroke-width="10" opacity=".45"/>
+  </g>
+</svg>

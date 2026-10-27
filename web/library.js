@@ -1,5 +1,5 @@
 'use strict';
-// Import of the "Proslushka" sound library: library/groups.json, merchant.json, names_ru.json and sounds/*.wav.
+// Import of the sound library: library/groups.json, merchant.json, names_ru.json and sounds/*.wav.
 // groups.json: game sound → item group; merchant.json: Field Merchant pools with weights (abibuilder.com).
 const Library = (() => {
   const RARITY = { 6: 'red', 5: 'gold', 4: 'purple', 3: 'blue', 2: 'green', 1: 'white' };
@@ -9,7 +9,7 @@ const Library = (() => {
     const find = tail => files.find(f => f.path.replace(/\\/g, '/').toLowerCase().endsWith(tail.toLowerCase()));
     const readJson = async tail => {
       const f = find(tail);
-      if (!f) throw new Error(`${tail} not found. Choose the "Proslushka" folder or its library folder.`);
+      if (!f) throw new Error(`${tail} not found. Choose the library folder.`);
       return JSON.parse(await f.blob.text());
     };
     const groups = (await readJson('groups.json')).groups;

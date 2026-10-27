@@ -1,4 +1,4 @@
-# ABI Kaluvan — сайт (`web/`)
+# Merchant Ear — сайт (`web/`)
 
 Статичный сайт без сборки и без серверной части. Все вычисления идут в браузере игрока:
 
@@ -29,10 +29,10 @@ python -m http.server 8080
 
 ## На Linux-сервере (nginx)
 
-1. Скопируйте содержимое `web/` на сервер, например в `/var/www/abi-kaluvan`.
+1. Скопируйте содержимое `web/` на сервер, например в `/var/www/merchant-ear`.
 2. Закройте сайт паролем:
    ```bash
-   sudo htpasswd -c /etc/nginx/abi-kaluvan.htpasswd player
+   sudo htpasswd -c /etc/nginx/merchant-ear.htpasswd player
    ```
 3. Добавьте сайт в nginx (пример — [`deploy/nginx.conf`](deploy/nginx.conf)) и получите сертификат:
    ```bash
@@ -44,4 +44,4 @@ python -m http.server 8080
 
 ## Покупки
 
-Ваши покупки сохраняются только в этом браузере (localStorage) и никуда не отправляются. Общая база оригинального проекта загружается с GitHub только для чтения. Чтобы отключить её, укажите `baseRemote: ''` в `config.js`.
+Ваши покупки сохраняются только в этом браузере (localStorage) и никуда не отправляются. Если хотите подмешивать общую базу покупок из интернета, укажите её адрес в `baseRemote` в `config.js` (по умолчанию выключено).

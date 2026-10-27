@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading;
 
-namespace AbiKaluvan.Client
+namespace MerchantEar.Client
 {
     public sealed class Peer
     {

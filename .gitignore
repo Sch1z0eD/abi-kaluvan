@@ -4,3 +4,4 @@ client/publish/
 *.user
 .vs/
 web/_debug/
+client/.idea/

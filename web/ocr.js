@@ -245,7 +245,7 @@ const Ocr = (() => {
     return bestScore <= 0.4 ? best : null;
   }
 
-  // Feed line above the grid: "neverh8me spent 200,000 Koen on a mystery cargo and obtained [Studio Monitor]".
+  // Feed line above the grid: "Player spent 200,000 Koen on a mystery cargo and obtained [Studio Monitor]".
   // The item name may be cut off by the panel edge. Returns { nick, price, item } or null.
   function parseFeed(text) {
     const s = text.replace(/\s+/g, ' ');

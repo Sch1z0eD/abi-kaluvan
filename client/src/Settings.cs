@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
-namespace AbiKaluvan.Client
+namespace MerchantEar.Client
 {
     public sealed class Settings
     {

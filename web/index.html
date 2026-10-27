@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="icon.ico">
-<title>ABI Kaluvan</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="icon.ico">
+<title>Merchant Ear</title>
 <style>
   :root {
     --bg: #111317; --panel: #1a1d23; --line: #2a2f38; --text: #e6e8eb; --muted: #8b93a1;
@@ -127,7 +128,7 @@
 </head>
 <body>
 <header>
-  <h1 data-i18n="app">ABI Kaluvan</h1>
+  <h1 data-i18n="app">Merchant Ear</h1>
   <button id="btnStart" class="primary" data-i18n="btn.start">Start catching</button>
   <button id="btnStop" disabled data-i18n="btn.stop">Stop</button>
   <span class="status" id="status" data-i18n="status.idle">Not running</span>
@@ -232,10 +233,11 @@
   </div>
 </main>
 
-<footer class="credits">Created by neverh8me and Claude Code</footer>
+<footer class="credits">Merchant Ear · <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GPL-3.0</a></footer>
 
 <video id="video" autoplay muted playsinline hidden></video>
 
+<script src="migrate.js"></script>
 <script src="config.js"></script>
 <script src="i18n.js"></script>
 <script src="audio.js"></script>
@@ -295,12 +297,12 @@ const LABEL_RETRY_MS = 700;  // no sooner than this after the previous attempt
 const SIZE_ALT_MARGIN = 0.1; // a sound that fits the cargo size may be this much weaker than the best one
 const PAYBACK_BUY = 0.05;    // mean value at least +5% over the price: "worth buying"
 const PAYBACK_RISK = -0.15;  // down to −15%: "a gamble", below: "skip"
-const BUYS_KEY = 'abi-kaluvan-buys-v1'; // purchases allowed per raid (2, or up to 4 with a levelled character): that many best buys are marked
+const BUYS_KEY = 'merchant-ear-buys-v1'; // purchases allowed per raid (2, or up to 4 with a levelled character): that many best buys are marked
 const CATEGORY_RED_MIN = 0.005; // a category cargo is highlighted (not dimmed) from this red chance
 const STALE_SHARE = 0.4;     // this share of the visible cargo clashing with a ready map means the list changed
 const STALE_PARSES = 4;      // for this many parses in a row
 const MISS_PARSES = 6;       // a confirmed cargo missing from its place this many parses in a row (scan phase) is dropped
-const VALUE_KEY = 'abi-kaluvan-value-v1'; // value basis for payback (VALUE_BASES)
+const VALUE_KEY = 'merchant-ear-value-v1'; // value basis for payback (VALUE_BASES)
 const VALUE_BASES = ['contact', 'merchant', 'market']; // see itemValue
 const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
 const PRICE_MATCH_LOG = 0.25; // the tooltip price must be close to the pool price (in log scale, ≈ ±28%)
@@ -314,18 +316,18 @@ const UNKNOWN_LOG_MS = 5000; // an unrecognized sound is logged at most this oft
 const HOVER_MAX_CARGO = 16;  // a tooltip covers at most this many cargo; more is not a tooltip
 const TIP_W = 3.2, TIP_H = 1.8; // price tooltip size in cells (with a margin)
 const BASE_UPDATE_MAX = 6;   // the appearance reference is updated only on small changes (not on a tooltip)
-const STORE_KEY = 'abi-ear-sounds-v4';       // v4: own recordings are raw sound, not a fingerprint
-const OLD_STORE_KEYS = ['abi-ear-sounds-v3', 'abi-ear-sounds-v2'];
-const OLD_REGION_KEY = 'abi-ear-region-v1'; // manual frame from old versions, no longer needed
+const STORE_KEY = 'merchant-ear-sounds-v4';       // v4: own recordings are raw sound, not a fingerprint
+const OLD_STORE_KEYS = ['merchant-ear-sounds-v3', 'merchant-ear-sounds-v2'];
+const OLD_REGION_KEY = 'merchant-ear-region-v1'; // manual frame from old versions, no longer needed
 const MERCHANT_SIDE = 0.5;   // the merchant grid is searched to the right of this share of the game window width
 const REDETECT_AFTER = 8;    // once per this many frames (until the map is ready) the cell size is re-checked
 const REDETECT_MAX_CARGO = 6; // this many cargo found: the cell size is certainly right
-const PROFILES_KEY = 'abi-ear-profiles-v1';
-const PROFILE_KEY = 'abi-ear-profile-v1';
-const BLUE_KEY = 'abi-ear-blue-v1';
-const MODE_KEY = 'abi-kaluvan-mode-v1'; // display mode: 'second' (second screen) or 'overlay' (one monitor)
-const PURCHASES_KEY = 'abi-kaluvan-purchases-v2'; // v1 had records from the nickname bug, not used
-const OLD_PURCHASE_KEYS = ['abi-kaluvan-purchases-v1', 'abi-kaluvan-nick-v1'];
+const PROFILES_KEY = 'merchant-ear-profiles-v1';
+const PROFILE_KEY = 'merchant-ear-profile-v1';
+const BLUE_KEY = 'merchant-ear-blue-v1';
+const MODE_KEY = 'merchant-ear-mode-v1'; // display mode: 'second' (second screen) or 'overlay' (one monitor)
+const PURCHASES_KEY = 'merchant-ear-purchases-v2'; // v1 had records from the nickname bug, not used
+const OLD_PURCHASE_KEYS = ['merchant-ear-purchases-v1', 'merchant-ear-nick-v1'];
 const PRIOR_N = 20;          // the merchant data weighs as much as this many own purchases (more: learns slower)
 const FEED_MS = 1000;        // how often to look at the "… obtained [item]" line above the grid
 const FEED_TOP = 1.15, FEED_BOTTOM = 0.6; // where it is: a band above the top of the list, in cells
@@ -337,7 +339,7 @@ const FEED_SAME_MS = 60000;  // the same line (price and similar name) within th
 const BASE_URL = 'library/purchases.json'; // shared base in the app folder
 const CONFIG = window.ABI_CONFIG || {};
 const BASE_REMOTE = CONFIG.baseRemote || ''; // and the freshest one on GitHub
-// ABI Kaluvan Client on the player's PC (game-only sound and screen), see config.js
+// Merchant Ear Client on the player's PC (game-only sound and screen), see config.js
 const CLIENT_URL = (new URLSearchParams(location.search).get('client') || CONFIG.clientUrl || 'ws://localhost:8777').replace(/\/+$/, '');
 
 // ---------- DOM ----------
@@ -914,7 +916,7 @@ function resetScan() {
 
 // "Scan again" (after a purchase): the merchant list keeps its place, cell size and scrollbar, only the cargo
 // moved. So the grid geometry stays and only the cargo are collected anew: drawing starts on the next frame.
-// The top of the list counts as seen if the list is scrolled to the top right now. (neverh8me/abi-kaluvan@3493071)
+// The top of the list counts as seen if the list is scrolled to the top right now.
 function rescan() {
   if (!P || !viewport) { resetScan(); return; }
   cargo = new Map(); results = new Map(); lastKey = null; frozenPlaced = null; hover = null; hoverSig = '';
@@ -1788,7 +1790,7 @@ function ownPurchase({ price, item }) {
   // What dropped is known from the line, so the bought cargo must fit it: its sound holds this item and its size
   // is the item's size. Many cargo share a price (200k, 250k…) and 1×1 cargo are not on the map at all, so "the last
   // sound heard" would often be another cargo's sound. Of several fitting cargo with this price the one heard last
-  // is taken; if none fits, the purchase is kept without a sound. (As in neverh8me/abi-kaluvan@bf13689.)
+  // is taken; if none fits, the purchase is kept without a sound.
   const named = [...itemById.values()].map(x => ({ name: x.nameEn || x.name, it: x }));
   const m = Ocr.matchName(item, named), it = m && m.it;
   const fits = (key, res) => {
@@ -2515,7 +2517,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 $('btnExport').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify({ version: 2, sounds })], { type: 'application/json' }));
-  a.download = 'abi-ear-sounds.json';
+  a.download = 'merchant-ear-sounds.json';
   a.click();
 };
 $('btnImport').onclick = () => $('file').click();

@@ -1,4 +1,4 @@
-// ABI Kaluvan Client: capture of the game sound and the game window.
+// Merchant Ear Client: capture of the game sound and the game window.
 // The sound is captured with the standard Windows mechanism (process loopback, as in OBS and Discord): the game
 // is not opened and nobody touches it, only the process number from the regular process list is needed.
 using System;
@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
-namespace AbiKaluvan.Client
+namespace MerchantEar.Client
 {
     // ---------- WASAPI ----------
     [ComImport, Guid("1CB9AD4C-DBFA-4c32-B178-C2F568A703B2"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

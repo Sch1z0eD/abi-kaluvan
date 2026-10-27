@@ -10,7 +10,7 @@
 //    (compression, muffling in the game), the bottom saves it.
 //  * Only the first MATCH_SEC of a template is compared, and only when a loud sound starts: then one
 //    FFT pass per sound is enough instead of continuous scanning.
-// The approach and settings (bands, 24 kHz, 0.2 s template, threshold 0.5) follow the "Proslushka" app.
+// The settings (bands, 24 kHz, 0.2 s template, threshold 0.5) are the ones proven by existing sound recognizers.
 const Ear = (() => {
   const SAMPLE_RATE = 48000;   // input: both live sound and the library
   const DECIM = 2;
