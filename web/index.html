@@ -294,6 +294,7 @@ const BUY_LIMIT = 2;         // mystery cargo purchases per raid: the best this 
 const CATEGORY_RED_MIN = 0.005; // a category cargo is highlighted (not dimmed) from this red chance
 const STALE_SHARE = 0.4;     // this share of the visible cargo clashing with a ready map means the list changed
 const STALE_PARSES = 4;      // for this many parses in a row
+const MISS_PARSES = 6;       // a confirmed cargo missing from its place this many parses in a row (scan phase) is dropped
 const VALUE_KEY = 'abi-kaluvan-value-v1'; // value basis for payback (VALUE_BASES)
 const VALUE_BASES = ['contact', 'merchant', 'market']; // see itemValue
 const PRICE_MARKUP = 1.1;    // the merchant adds ~10% to the pool price (100,000 in the table — 110,000 in the game)
@@ -1148,25 +1149,34 @@ function analyze(src, rp) {
     else fresh.push({ key, C, R, it });
   }
 
-  // The list changed under the map (a purchase reshuffled it, new merchant stock): most visible cargo then clash with
-  // the map — in the scan phase too, where old cargo with many votes would otherwise keep winning. A few parses in a
-  // row like that, and the map is built anew, without "Scan again". Cargo next to the cursor are not counted:
-  // a price tooltip hanging there breaks their borders for a moment.
-  if (quiet && placedCargo().length) {
-    const placedNow = placedCargo(), placedKeys = new Set(placedNow.map(([k]) => k));
-    const cur = cursorTrack.length && cursorAt(now);
-    const cc = cur && cur.in ? Math.floor((cur.x - phaseX) / P) : null, cr = cur && cur.in ? Math.floor((cur.y + offset) / P) : null;
+  // The list changed under the map (a purchase reshuffled it, new merchant stock). Cargo next to the cursor are not
+  // judged: a price tooltip hanging there breaks their borders for a moment.
+  const cur = quiet && cursorTrack.length ? cursorAt(now) : null;
+  const cc = cur && cur.in ? Math.floor((cur.x - phaseX) / P) : null, cr = cur && cur.in ? Math.floor((cur.y + offset) / P) : null;
+  const nearCursor = (C, R, w, h) => cc !== null && C + w > cc && C <= cc + TIP_W + 1 && R + h > cr && R <= cr + TIP_H + 1;
+  if (quiet && phase === 'frozen') {
+    // A ready map: most visible cargo clash with it for a few parses in a row → built anew, without "Scan again"
+    const frozenKeys = new Set(frozenPlaced.map(([k]) => k));
     let clash = 0, counted = 0;
     for (const [key, it] of itemOf) {
       const [C, R] = key.split(',').map(Number);
-      if (cc !== null && C + it.w > cc && C <= cc + TIP_W + 1 && R + it.h > cr && R <= cr + TIP_H + 1) continue;
+      if (nearCursor(C, R, it.w, it.h)) continue;
       counted++;
-      if (placedKeys.has(key)) continue;
-      if (placedNow.some(([, r]) => C < r.C + r.w && r.C < C + it.w && R < r.R + r.h && r.R < R + it.h)) clash++;
+      if (!frozenKeys.has(key) && overlapsFrozen({ C, R, w: it.w, h: it.h })) clash++;
     }
     if (counted >= 3 && clash >= Math.max(2, counted * STALE_SHARE)) {
       if (++staleCount >= STALE_PARSES) { log(tr('log.listChanged')); resetScan(); return; }
     } else staleCount = 0;
+  } else if (quiet && phase === 'scan' && sb) {
+    // While the map is built, variants of cargo come and go (a row off by one while scrolling, a border hidden under a
+    // long label), so the map is never reset here. Instead a confirmed cargo that is fully in view but has not been
+    // found at its place for MISS_PARSES parses in a row is gone (bought, the list moved) and is dropped alone.
+    const seenKeys = new Set(itemOf.keys());
+    for (const [key, rec] of placedCargo()) {
+      if (!fullyVisible(rec, grid, colOf) || nearCursor(rec.C, rec.R, rec.w, rec.h)) continue;
+      rec.miss = seenKeys.has(key) ? 0 : (rec.miss || 0) + 1;
+      if (rec.miss >= MISS_PARSES) { cargo.delete(key); results.delete(key); }
+    }
   }
 
   if (phase === 'scan' && quiet) {
